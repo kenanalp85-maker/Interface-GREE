@@ -4743,58 +4743,55 @@
             }, 2000);
         });
     </script>
-</body>
+    <!-- WIPE REPORT LOGIC (Permanent Delete) -->
+    <script>
+        window.addEventListener('load', function () {
+            setTimeout(() => {
+                if (typeof app !== 'undefined') {
+                    app.wipeReport = function (id) {
+                        if (!confirm("SUPPRIMER DÉFINITIVEMENT ?\nCette action est irréversible (Supprime aussi la sauvegarde).")) return;
 
-</html>
-setTimeout(() => {
-try {
-const backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
-if (backups.length === 0) return;
+                        // 1. Delete from Main Data
+                        // Handle both number/string IDs
+                        app.data.reports = app.data.reports.filter(r => r.id !== id && String(r.id) !== String(id));
+                        app.save();
 
-let currentRaw = localStorage.getItem('hv_app_data');
-let currentData = currentRaw ? JSON.parse(currentRaw) : { reports: [] };
-if (!currentData.reports) currentData.reports = [];
+                        // 2. Delete from Backup Storage
+                        try {
+                            let backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
+                            const initialLen = backups.length;
+                            backups = backups.filter(b => b.id !== id && String(b.id) !== String(id));
 
-let addedCount = 0;
-backups.forEach(b => {
-if (!currentData.reports.find(r => r.id === b.id)) {
-currentData.reports.unshift(b);
-addedCount++;
-}
-});
+                            if (backups.length !== initialLen) {
+                                localStorage.setItem('hv_reports_backup', JSON.stringify(backups));
+                                console.log("Deleted from backup: " + id);
+                            }
+                        } catch (e) { console.error("Backup delete error", e); }
 
-if (addedCount > 0) {
-const newJson = JSON.stringify(currentData);
-localStorage.setItem('hv_app_data', newJson);
-localStorage.setItem('hv_app_v2', newJson);
+                        // 3. UI Update (Refresh current view)
+                        // Try to find which view is active
+                        const userDashboard = document.getElementById('user-dashboard');
+                        const adminScreen = document.getElementById('admin-screen');
 
-alert("✅ SYSTÈME DE RÉCUPÉRATION :\n" + addedCount + " rapport(s) manquant(s) ont été restaurés depuis la sauvegarde
-!\n\nLa page va redémarrer.");
-window.location.reload();
-}
-} catch (e) { console.error("Auto-Repair failed", e); }
-}, 1000);
-});
-</script>
-setTimeout(() => {
-try {
-const lsData = JSON.parse(localStorage.getItem('hv_app_data') || '{}');
-const lsCount = (lsData.reports || []).length;
+                        if (userDashboard && !userDashboard.classList.contains('hidden')) {
+                            if (app.renderArchive) app.renderArchive('user-archive-table');
+                            // Also refresh recent activites
+                            if (app.renderUserDashboard) app.renderUserDashboard();
+                        }
 
-const backupData = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
-const backupCount = backupData.length;
+                        if (adminScreen && !adminScreen.classList.contains('hidden')) {
+                            if (app.renderArchive) app.renderArchive('admin-archive-table', true);
+                        }
 
-const appCount = (typeof app !== 'undefined' && app.data && app.data.reports) ? app.data.reports.length : 'N/A';
-
-alert(`📢 DIAGNOSTIC V3.0\n\n1. Stockage Principal (LS): ${lsCount} rapports\n2. Système de Sauvegarde (Backup):
-${backupCount} rapports\n3. Mémoire de l'App: ${appCount} rapports\n\nSi le nombre "Backup" est plus grand que
-"Stockage Principal", la restauration automatique a échoué.`);
-} catch (e) {
-console.error("Diag failed", e);
-}
-}, 2000);
-});
-</script>
+                        alert("Rapport supprimé.");
+                    };
+                    // CRITICAL: Override original delete function
+                    app.deleteReport = app.wipeReport;
+                    console.log("Delete logic upgraded to permanent wipe.");
+                }
+            }, 500); // Wait for app init
+        });
+    </script>
 </body>
 
 </html>
