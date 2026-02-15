@@ -173,12 +173,15 @@
     <!-- LOGIN SCREEN -->
     <div id="login-screen" class="fixed inset-0 z-50 bg-slate-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden fade-in">
-            <div class="bg-indigo-600 p-8 text-center transition-colors duration-300" id="login-header-bg">
-                <div id="login-logo-container" class="app-logo-container mb-4 flex justify-center">
-                    <i data-lucide="zap" class="w-12 h-12 text-white"></i>
+            <div class="bg-emerald-600 p-8 text-center transition-colors duration-300" id="login-header-bg">
+                <div class="flex justify-center mb-4">
+                    <div class="p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                        <i data-lucide="zap" class="w-10 h-10 text-white"></i>
+                    </div>
                 </div>
-                <h1 id="login-app-title" class="text-2xl font-bold text-white app-title-text">Gestion Rapports</h1>
-                <p class="text-indigo-100 text-sm">Connexion Sécurisée</p>
+                <h1 id="login-app-title" class="text-2xl font-bold text-white app-title-text">Gestion Rapports (Wizard)
+                </h1>
+                <p class="text-indigo-100 text-sm">v3.0 - Mode Saisie Avancé</p>
             </div>
             <div class="p-8 space-y-4">
                 <input type="text" id="username" placeholder="Identifiant" class="input-base">
@@ -298,6 +301,7 @@
                                 <option value="select">Liste Déroulante (Select)</option>
                                 <option value="search_ref">Recherche Anomalie (Ref)</option>
                                 <option value="auto_serial">N° Série Auto (NC_XX_0000)</option>
+                                <option value="table">Tableau (Lignes)</option>
                                 <option value="image">Photo / Camera</option>
                                 <option value="header">-- Titre de Section --</option>
                                 <option value="drawing">Dessin / Croquis</option>
@@ -331,6 +335,16 @@
                                 <select id="new-field-target-form" class="input-base text-sm mt-1"></select>
                                 <p class="text-[10px] text-orange-600 mt-1 leading-tight">L'utilisateur pourra chercher
                                     un N° de série (NC_...) provenant de ce formulaire.</p>
+                            </div>
+
+                            <!-- Table Config -->
+                            <div id="table-config" class="hidden bg-emerald-50 p-2 rounded border border-emerald-100">
+                                <label class="text-xs font-bold text-emerald-800 uppercase">Colonnes du Tableau
+                                    :</label>
+                                <input type="text" id="new-field-table-cols" placeholder="Col1, Col2, Col3..."
+                                    class="input-base text-sm mt-1">
+                                <p class="text-[10px] text-emerald-600 mt-1 leading-tight">Séparez les noms de colonnes
+                                    par des virgules.</p>
                             </div>
                             <div class="flex gap-2">
                                 <button id="btn-add-field" onclick="app.addField()"
@@ -1027,9 +1041,16 @@
 
             save() {
                 try {
-                    localStorage.setItem('hv_app_v2', JSON.stringify(this.data));
+                    // DUAL WRITE FIX: Ensure data is saved to both potential keys used by init()
+                    const json = JSON.stringify(this.data);
+                    localStorage.setItem('hv_app_v2', json);
+                    localStorage.setItem('hv_app_data', json); // This is what init() likely reads!
+
                     if (typeof cloudSave !== 'undefined') cloudSave(this.data);
-                } catch (e) { console.error("Save Error", e); }
+                } catch (e) {
+                    alert("ERREUR CRITIQUE DE SAUVEGARDE :\n" + e.message + "\n\nVotre stockage local est peut-être plein !");
+                    console.error("Save Error", e);
+                }
             },
 
             // --- AUTH ---
@@ -1152,67 +1173,416 @@
             // Replaces existing renderFormFields
             renderFormFields(isRestore = false) {
                 const c = document.getElementById('renderer-fields');
-                let draftValues = {};
-                if (isRestore) {
-                    try { draftValues = JSON.parse(localStorage.getItem('hv_draft') || '{}'); } catch (e) { }
-                }
+                const submitBtn = document.querySelector('button[onclick="app.submitForm()"]');
+                if (submitBtn) submitBtn.style.display = 'block'; // Reset
 
-                c.innerHTML = this.activeForm.fields.map(f => {
-                    if (f.type === 'header') return `<h3 class="font-bold text-lg border-b pb-2 pt-4 border-slate-200 text-indigo-900">${f.label}</h3>`;
+                // 1. CHECK FOR WIZARD MODE (If Table exists)
+                const tableField = this.activeForm.fields.find(f => f.type === 'table' || (f.columnNames && f.columnNames.length > 0));
 
-                    let inputHtml = '';
-                    const loadedVal = draftValues[f.id] || '';
+                if (tableField) {
+                    // --- WIZARD MODE ---
+                    if (submitBtn) submitBtn.style.display = 'none'; // Hide default submit
 
-                    if (f.type === 'select') {
-                        const disabled = f.parentId ? 'disabled' : '';
-                        inputHtml = `<select id="inp_${f.id}" class="input-base" ${disabled} onchange="app.handleFieldChange('${f.id}'); app.saveDraft();"><option value="">Sélectionner...</option></select>`;
-                    } else if (f.type === 'image') {
-                        inputHtml = `
-                            <div class="space-y-2">
-                                <input type="file" id="inp_${f.id}" accept="image/*" capture="environment" class="hidden" onchange="app.handleImage(this, 'prev_${f.id}')">
-                                <button type="button" onclick="document.getElementById('inp_${f.id}').click()" class="w-full h-10 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 font-medium">
-                                    <i data-lucide="camera" class="w-5 h-5"></i> Prendre Photo
+                    this.wizState = { step: 1, tableField: tableField, rows: [], editIndex: -1 };
+
+                    // Load Draft if Restore
+                    let draftValues = {};
+                    if (isRestore) {
+                        try {
+                            draftValues = JSON.parse(localStorage.getItem('hv_draft') || '{}');
+                            if (draftValues[tableField.id]) {
+                                this.wizState.rows = JSON.parse(draftValues[tableField.id]);
+                            }
+                        } catch (e) { }
+                    }
+
+                    // RENDER WIZARD HTML
+                    c.innerHTML = `
+                    <div id="wizard-container" class="space-y-6 animate-slide-in">
+                        <!-- STEP 1: GENERAL -->
+                        <div id="wiz-step-1" class="wiz-step">
+                            <h2 class="font-bold text-lg text-indigo-900 border-b pb-2 mb-4">1. Informations Générales</h2>
+                            <div id="wiz-gen-fields" class="space-y-4"></div>
+                            <button onclick="app.wizNext()" class="mt-6 w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 flex justify-center gap-2 items-center">
+                                Suivant <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+
+                        <!-- STEP 2: TABLE ENTRY -->
+                        <div id="wiz-step-2" class="wiz-step hidden">
+                            <h2 class="font-bold text-lg text-indigo-900 border-b pb-2 mb-4">2. Saisie : ${tableField.label}</h2>
+                            <div id="wiz-table-form" class="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200"></div>
+                            <div class="flex gap-2 mt-6">
+                                <button onclick="app.wizGoStep(1)" class="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold">Retour</button>
+                                <button onclick="app.wizAddRow()" class="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 flex justify-center gap-2 items-center">
+                                    <i data-lucide="plus-circle" class="w-5 h-5"></i> <span id="wiz-btn-add-text">Ajouter</span>
                                 </button>
-                                <img id="prev_${f.id}" src="${loadedVal}" class="${loadedVal ? '' : 'hidden'} img-preview">
-                                <input type="hidden" id="val_${f.id}" value="${loadedVal}">
                             </div>
-                        `;
-                    } else if (f.type === 'auto_serial') {
-                        inputHtml = `<input type="text" id="inp_${f.id}" class="input-base bg-slate-100 font-mono text-slate-500" value="(Auto: NC_YY_xxxx)" disabled>`;
-                    } else {
-                        const type = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text');
-                        inputHtml = `<input type="${type}" id="inp_${f.id}" class="input-base" value="${loadedVal}" oninput="app.saveDraft()" placeholder="...">`;
+                        </div>
+
+                        <!-- STEP 3: REVIEW -->
+                        <div id="wiz-step-3" class="wiz-step hidden">
+                            <h2 class="font-bold text-lg text-indigo-900 border-b pb-2 mb-4">3. Récapitulatif</h2>
+                            
+                            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left text-sm">
+                                        <thead class="bg-indigo-50 text-indigo-900 font-bold uppercase text-xs">
+                                            <tr id="wiz-table-head"></tr>
+                                        </thead>
+                                        <tbody id="wiz-table-body" class="divide-y divide-slate-100"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-2 mt-6">
+                                <button onclick="app.wizGoStep(2)" class="w-1/3 py-4 bg-indigo-50 text-indigo-700 rounded-xl font-bold border border-indigo-100 flex justify-center items-center gap-2">
+                                    <i data-lucide="plus" class="w-4 h-4"></i> Ajouter
+                                </button>
+                                <button onclick="app.wizSubmit()" class="w-2/3 py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-xl hover:bg-indigo-700 flex justify-center gap-2 items-center">
+                                    <i data-lucide="save" class="w-5 h-5"></i> Enregistrer
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+
+                    // RENDER FIELDS INTO STEPS
+                    const genFieldsContainer = document.getElementById('wiz-gen-fields');
+                    const tableFormContainer = document.getElementById('wiz-table-form');
+
+                    // 1. General Fields (Step 1)
+                    const generalFields = this.activeForm.fields.filter(f => f.id !== tableField.id);
+                    genFieldsContainer.innerHTML = generalFields.map(f => this.renderSingleFieldHTML(f, draftValues[f.id])).join('');
+
+                    // 2. Table Fields (Step 2)
+                    // Parse Columns
+                    const cols = (tableField.columnNames || 'Col1').split(/[,;]/).map(c => c.trim()).filter(c => c);
+                    this.wizState.cols = cols;
+
+                    tableFormContainer.innerHTML = cols.map((col, i) => `
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">${col}</label>
+                            <input type="text" id="wiz-col-${i}" class="input-base" placeholder="...">
+                        </div>
+                    `).join('');
+
+                    // Render Table Head (Step 3)
+                    document.getElementById('wiz-table-head').innerHTML =
+                        cols.map(c => `<th class="p-3 whitespace-nowrap">${c}</th>`).join('') + '<th class="p-3 w-16 text-center">Act</th>';
+
+                    this.wizRenderTable(); // Render empty table
+
+                    // Init Selects
+                    generalFields.filter(f => f.type === 'select').forEach(f => {
+                        this.populateSelect(f.id, 'root');
+                        if (draftValues[f.id]) document.getElementById(`inp_${f.id}`).value = draftValues[f.id];
+                    });
+
+                } else {
+                    // --- CLASSIC MODE ---
+                    let draftValues = {};
+                    // Load draft if restoring OR if a draft exists for this form (auto-resume)
+                    const savedMeta = JSON.parse(localStorage.getItem('hv_draft_meta') || '{}');
+                    if (savedMeta.formId === this.activeForm.id) {
+                        try { draftValues = JSON.parse(localStorage.getItem('hv_draft') || '{}'); } catch (e) { }
                     }
 
-                    return `<div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">${f.label} ${f.unit ? `(${f.unit})` : ''} ${f.required ? '<span class="text-red-500">*</span>' : ''}</label>${inputHtml}</div>`;
-                }).join('');
+                    c.innerHTML = this.activeForm.fields.map(f => this.renderSingleFieldHTML(f, draftValues[f.id])).join('');
 
-                // Init Selects & Restore Draft Selects
-                this.activeForm.fields.filter(f => f.type === 'select' && !f.parentId).forEach(f => {
-                    this.populateSelect(f.id, 'root');
-                    if (draftValues[f.id]) {
-                        document.getElementById(`inp_${f.id}`).value = draftValues[f.id];
-                        // If selected, trigger change to load children
-                        this.handleFieldChange(f.id);
-                    }
-                });
-
-                // For dependent selects, we need to wait for parents. 
-                // Simple approach: Iterate again for L2 deps
-                if (isRestore) {
-                    this.activeForm.fields.filter(f => f.type === 'select' && f.parentId).forEach(f => {
-                        if (draftValues[f.parentId]) { // Parent has value
-                            // Populate was triggered by parent handleFieldChange above
-                            // Now set value
-                            setTimeout(() => {
-                                const el = document.getElementById(`inp_${f.id}`);
-                                if (el && draftValues[f.id]) el.value = draftValues[f.id];
-                            }, 50);
+                    // Init Selects & Logic
+                    this.activeForm.fields.filter(f => f.type === 'select' && !f.parentId).forEach(f => {
+                        this.populateSelect(f.id, 'root');
+                        if (draftValues[f.id]) {
+                            document.getElementById(`inp_${f.id}`).value = draftValues[f.id];
+                            this.handleFieldChange(f.id);
                         }
                     });
+                    // Restore dependent selects
+                    if (Object.keys(draftValues).length > 0) {
+                        this.activeForm.fields.filter(f => f.type === 'select' && f.parentId).forEach(f => {
+                            if (draftValues[f.parentId]) {
+                                setTimeout(() => {
+                                    const el = document.getElementById(`inp_${f.id}`);
+                                    if (el && draftValues[f.id]) el.value = draftValues[f.id];
+                                }, 50);
+                            }
+                        });
+                    }
                 }
 
                 lucide.createIcons();
+            },
+
+            // HELPER: Render Single Field (Shared)
+            renderSingleFieldHTML(f, val = '') {
+                if (f.type === 'header') return `<h3 class="font-bold text-lg border-b pb-2 pt-4 border-slate-200 text-indigo-900">${f.label}</h3>`;
+                let inputHtml = '';
+
+                if (f.type === 'select') {
+                    const disabled = f.parentId ? 'disabled' : '';
+                    inputHtml = `<select id="inp_${f.id}" class="input-base" ${disabled} onchange="app.handleFieldChange('${f.id}'); app.saveDraft();"><option value="">Sélectionner...</option></select>`;
+                } else if (f.type === 'image') {
+                    inputHtml = `
+                        <div class="space-y-2">
+                            <input type="file" id="inp_${f.id}" accept="image/*" capture="environment" class="hidden" onchange="app.handleImage(this, 'prev_${f.id}')">
+                            <button type="button" onclick="document.getElementById('inp_${f.id}').click()" class="w-full h-10 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 font-medium">
+                                <i data-lucide="camera" class="w-5 h-5"></i> Prendre Photo
+                            </button>
+                            <img id="prev_${f.id}" src="${val}" class="${val ? '' : 'hidden'} img-preview">
+                            <input type="hidden" id="val_${f.id}" value="${val}">
+                        </div>`;
+                } else if (f.type === 'auto_serial') {
+                    inputHtml = `<input type="text" id="inp_${f.id}" class="input-base bg-slate-100 font-mono text-slate-500" value="(Auto: NC_YY_xxxx)" disabled>`;
+                } else if (f.type === 'table' || (f.columnNames && f.columnNames.length > 0)) {
+                    // In classic mode, render normal table (fallback)
+                    // 1. Parse Columns (Support comma OR semicolon)
+                    const cols = (f.columnNames || 'Col1').split(/[,;]/).map(c => c.trim()).filter(c => c);
+
+                    // 2. Build Table Header
+                    const ths = cols.map(c => `<th class="p-2 text-xs font-bold text-slate-500 uppercase bg-slate-50 border-b border-slate-200">${c}</th>`).join('');
+
+                    // 3. Pre-Render Rows (Synchronous)
+                    const initialData = JSON.parse(val || '[]');
+                    const preRenderedRows = initialData.map((row, i) => `
+                        <tr class="group hover:bg-slate-50">
+                            ${cols.map(col => `
+                                <td class="p-1 border-r border-slate-100 last:border-0 relative">
+                                    <input type="text" 
+                                        class="w-full bg-transparent p-2 outline-none text-slate-700" 
+                                        value="${row[col] || ''}" 
+                                        oninput="app.updateTableData('${f.id}', ${i}, '${col}', this.value)">
+                                </td>
+                            `).join('')}
+                            <td class="p-1 w-10 text-center">
+                                <button onclick="app.removeTableRow('${f.id}', ${i})" class="text-slate-300 hover:text-red-500 transition">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    inputHtml = `<input type="hidden" id="inp_${f.id}" value='${val || '[]'}'>
+                    
+                    <div class="border rounded-xl overflow-hidden shadow-sm mt-2">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse" id="tbl_${f.id}">
+                                <thead><tr>${ths}<th class="w-10 bg-slate-50 border-b border-slate-200"></th></tr></thead>
+                                <tbody id="tbody_${f.id}" class="text-sm text-slate-700 divide-y divide-slate-100">
+                                    ${preRenderedRows}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-2 bg-slate-50 border-t border-slate-100">
+                            <button type="button" onclick="app.addTableRow('${f.id}')" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                                <i data-lucide="plus-circle" class="w-4 h-4"></i> Ajouter une ligne
+                            </button>
+                        </div>
+                    </div>`;
+                } else {
+                    const type = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text');
+                    inputHtml = `<input type="${type}" id="inp_${f.id}" class="input-base" value="${val}" oninput="app.saveDraft()" placeholder="...">`;
+                }
+                return `<div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">${f.label} ${f.unit ? `(${f.unit})` : ''} ${f.required ? '<span class="text-red-500">*</span>' : ''}</label>${inputHtml}</div>`;
+            },
+
+            // --- WIZARD ACTIONS ---
+            wizGoStep(step) {
+                document.getElementById('wiz-step-1').classList.add('hidden');
+                document.getElementById('wiz-step-2').classList.add('hidden');
+                document.getElementById('wiz-step-3').classList.add('hidden');
+                document.getElementById(`wiz-step-${step}`).classList.remove('hidden');
+
+                if (step === 2) {
+                    // Reset Form if adding new
+                    if (this.wizState.editIndex === -1) {
+                        this.wizState.cols.forEach((c, i) => document.getElementById(`wiz-col-${i}`).value = '');
+                        document.getElementById('wiz-btn-add-text').innerText = "Ajouter";
+                    }
+                }
+                window.scrollTo(0, 0);
+            },
+
+            wizSaveDraft() {
+                // 1. Trigger standard save (for inputs)
+                this.saveDraft();
+
+                // 2. Manually save table rows (Wizard state)
+                if (this.wizState && this.wizState.tableField) {
+                    try {
+                        const draft = JSON.parse(localStorage.getItem('hv_draft') || '{}');
+                        draft[this.wizState.tableField.id] = JSON.stringify(this.wizState.rows);
+                        localStorage.setItem('hv_draft', JSON.stringify(draft));
+                    } catch (e) { }
+                }
+            },
+
+            wizNext() {
+                this.wizSaveDraft();
+                this.wizGoStep(2);
+            },
+
+            wizAddRow() {
+                const newRow = {};
+                let filled = false;
+                this.wizState.cols.forEach((c, i) => {
+                    const val = document.getElementById(`wiz-col-${i}`).value;
+                    newRow[c] = val;
+                    if (val) filled = true;
+                });
+
+                if (!filled) return alert("Veuillez remplir au moins un champ.");
+
+                if (this.wizState.editIndex > -1) {
+                    this.wizState.rows[this.wizState.editIndex] = newRow;
+                    this.wizState.editIndex = -1;
+                } else {
+                    this.wizState.rows.push(newRow);
+                }
+
+                this.wizRenderTable();
+                this.wizSaveDraft();
+                this.wizGoStep(3);
+            },
+
+            wizEditRow(index) {
+                this.wizState.editIndex = index;
+                const row = this.wizState.rows[index];
+                this.wizState.cols.forEach((c, i) => {
+                    document.getElementById(`wiz-col-${i}`).value = row[c] || '';
+                });
+                document.getElementById('wiz-btn-add-text').innerText = "Mettre à jour";
+                this.wizGoStep(2);
+                this.wizSaveDraft();
+            },
+
+            wizDeleteRow(index) {
+                if (confirm("Supprimer ?")) {
+                    this.wizState.rows.splice(index, 1);
+                    this.wizRenderTable();
+                    this.wizSaveDraft();
+                }
+            },
+
+            wizBackToEntry() {
+                this.wizState.editIndex = -1;
+                this.wizGoStep(2);
+            },
+
+            wizRenderTable() {
+                const tbody = document.getElementById('wiz-table-body');
+                if (this.wizState.rows.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="${this.wizState.cols.length + 1}" class="p-4 text-center text-slate-400 italic">Aucune donnée.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = this.wizState.rows.map((row, i) => `
+                    <tr class="hover:bg-indigo-50/50 border-b border-indigo-50 last:border-0 group">
+                        ${this.wizState.cols.map(c => `<td class="p-3 whitespace-nowrap">${row[c] || '-'}</td>`).join('')}
+                        <td class="p-3 text-center">
+                            <button onclick="app.wizEditRow(${i})" class="text-blue-500 hover:text-indigo-600 p-1"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                            <button onclick="app.wizDeleteRow(${i})" class="text-slate-400 hover:text-red-500 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+                lucide.createIcons();
+            },
+
+            wizSubmit() {
+                // Merge Data
+                const tableId = this.wizState.tableField.id;
+
+                // Manually gather gen fields
+                const formData = {};
+                this.activeForm.fields.forEach(f => {
+                    if (f.id === tableId) {
+                        formData[f.id] = JSON.stringify(this.wizState.rows);
+                    } else if (f.type !== 'header') {
+                        const el = document.getElementById(f.type === 'image' ? `val_${f.id}` : `inp_${f.id}`);
+                        if (el) formData[f.id] = el.value;
+                    }
+                });
+
+                // Create Report Object manually
+                const newReport = {
+                    id: Date.now(),
+                    formId: this.activeForm.id,
+                    formTitle: this.activeForm.title,
+                    timestamp: new Date().toISOString(),
+                    user: this.currentUser ? this.currentUser.name : 'Guest',
+                    values: formData
+                };
+
+                this.data.reports.unshift(newReport);
+                // Auto Serial Update
+                if (this.activeForm.fields.find(f => f.type === 'auto_serial')) {
+                    this.data.serial.count++;
+                }
+
+                this.save();
+
+                // Clear Draft
+                localStorage.removeItem('hv_draft');
+                localStorage.removeItem('hv_draft_meta');
+
+                // --- AUTO DOWNLOAD REMOVED BY USER REQUEST ---
+                // EMERGENCY BACKUP SYSTEM
+                try {
+                    let backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
+                    // Check if already exists in backup to avoid duplicates
+                    if (!backups.find(b => b.id === newReport.id)) {
+                        backups.push(newReport);
+                        localStorage.setItem('hv_reports_backup', JSON.stringify(backups));
+                        console.log("Report backed up to secondary storage.");
+                    }
+                } catch (bkErr) {
+                    console.error("Backup failed", bkErr);
+                }
+
+                try {
+                    // SAVE TO LOCAL STORAGE
+                    this.save();
+
+                    // FORCE MANUAL DIAGNOSTIC
+                    const json = JSON.stringify(this.data);
+                    localStorage.setItem('hv_app_v2', json);
+                    localStorage.setItem('hv_app_data', json);
+
+                    alert("Succès ! Total Rapports: " + this.data.reports.length + "\n(Données Manuellement Écrites)");
+
+                    // FORCE RELOAD TO CLEAR ALL STATES & SHOW DATA
+                    window.location.reload();
+
+                } catch (mainErr) {
+                    alert("Erreur critique: " + mainErr.message);
+                    console.error(mainErr);
+                    window.location.reload();
+                }
+            },
+
+            exportWizardExcel(report, form, cols, rows) {
+                // Custom Layout:
+                // Row 1: Headers Gen
+                // Row 2: Values Gen
+                // Row 4: Headers Table
+                // Row 5+: Values Table
+
+                const genFields = form.fields.filter(f => f.type !== 'table' && f.type !== 'header');
+
+                const ws_data = [
+                    genFields.map(f => f.label),
+                    genFields.map(f => report.values[f.id] || ''),
+                    [], // Spacers
+                    cols
+                ];
+
+                rows.forEach(r => {
+                    ws_data.push(cols.map(c => r[c] || ''));
+                });
+
+                const ws = XLSX.utils.aoa_to_sheet(ws_data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Rapport");
+                const fname = `Rapport_${form.title}_${report.id}.xlsx`;
+                XLSX.writeFile(wb, fname);
             },
 
             // ... handleFieldChange & handleImage updates ...
@@ -1322,6 +1692,133 @@
 
                 alert("Enregistré !");
                 this.showMenu();
+            },
+
+            // --- TABLE FIELD HELPERS ---
+            addTableRow(fieldId) {
+                const f = this.activeForm.fields.find(x => x.id === fieldId);
+                if (!f) return;
+
+                // Get current value
+                const input = document.getElementById(`inp_${fieldId}`);
+                let data = [];
+                try { data = JSON.parse(input.value || '[]'); } catch (e) { data = []; }
+
+                // Create empty row object based on cols
+                // Create empty row object based on cols
+                const cols = (f.columnNames || 'Col1').split(/[,;]/).map(c => c.trim()).filter(c => c);
+                let newRow = {};
+                cols.forEach(c => newRow[c] = "");
+
+                data.push(newRow);
+                input.value = JSON.stringify(data);
+
+                this.saveDraft();
+                this.renderTableList(fieldId);
+            },
+
+            removeTableRow(fieldId, index) {
+                const input = document.getElementById(`inp_${fieldId}`);
+                let data = [];
+                try { data = JSON.parse(input.value || '[]'); } catch (e) { return; }
+
+                data.splice(index, 1);
+                input.value = JSON.stringify(data);
+
+                this.saveDraft();
+                this.renderTableList(fieldId);
+            },
+
+            updateTableData(fieldId, index, key, val) {
+                const input = document.getElementById(`inp_${fieldId}`);
+                let data = [];
+                try { data = JSON.parse(input.value || '[]'); } catch (e) { return; }
+
+                if (data[index]) {
+                    data[index][key] = val;
+                    input.value = JSON.stringify(data);
+                    this.saveDraft();
+                }
+            },
+
+            renderTableList(fieldId) {
+                const f = this.activeForm.fields.find(x => x.id === fieldId);
+                if (!f) return;
+
+                const input = document.getElementById(`inp_${fieldId}`);
+                if (!input) return; // Not ready
+
+                let data = [];
+                try { data = JSON.parse(input.value || '[]'); } catch (e) { data = []; }
+
+                const tbody = document.getElementById(`tbody_${fieldId}`);
+                if (!tbody) return;
+
+                const cols = (f.columnNames || 'Col1').split(/[,;]/).map(c => c.trim()).filter(c => c);
+
+                tbody.innerHTML = data.map((row, i) => `
+                    <tr class="group hover:bg-slate-50">
+                        ${cols.map(col => `
+                            <td class="p-1 border-r border-slate-100 last:border-0 relative">
+                                <input type="text" 
+                                    class="w-full bg-transparent p-2 outline-none text-slate-700" 
+                                    value="${row[col] || ''}" 
+                                    oninput="app.updateTableData('${fieldId}', ${i}, '${col}', this.value)">
+                            </td>
+                        `).join('')}
+                        <td class="p-1 w-10 text-center">
+                            <button onclick="app.removeTableRow('${fieldId}', ${i})" class="text-slate-300 hover:text-red-500 transition">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                lucide.createIcons();
+            },
+
+            cloneReport(reportId) {
+                const report = this.data.reports.find(r => r.id === reportId);
+                if (!report) return;
+
+                if (!confirm("Créer un nouveau rapport basé sur celui-ci ?")) return;
+
+                const form = this.data.forms.find(f => f.id === report.formId);
+                if (!form) return alert("Le formulaire original n'existe plus.");
+
+                // Prepare Data
+                const draft = {};
+
+                // Copy values
+                for (const [key, val] of Object.entries(report.values)) {
+                    draft[key] = val;
+                }
+
+                // Reset specific fields? (Optional: Date to Today)
+                // form.fields.filter(f => f.type === 'date').forEach(f => {
+                //      draft[f.id] = new Date().toISOString().split('T')[0];
+                // });
+
+                // SAVE DRAFT
+                localStorage.setItem('hv_draft', JSON.stringify(draft));
+                localStorage.setItem('hv_draft_meta', JSON.stringify({
+                    formId: form.id,
+                    timestamp: Date.now()
+                }));
+
+                // Activate Form
+                this.activeForm = form;
+
+                // UI Switch
+                document.getElementById('user-dashboard').classList.add('hidden');
+                document.getElementById('user-archive').classList.add('hidden');
+                document.getElementById('admin-panel').classList.add('hidden'); // Close admin if open
+
+                document.getElementById('form-renderer').classList.remove('hidden');
+                document.getElementById('renderer-title').innerText = form.title + " (Copie)";
+
+                // RENDER (Restore = true)
+                this.renderFormFields(true);
             },
 
             // --- ADMIN: TABS ---
@@ -1546,7 +2043,8 @@
                     </th>`;
                 });
                 // Add Extra Header for Actions
-                if (isAdmin) html += '<th class="p-3 w-10 text-center">Act.</th>';
+                // Add Extra Header for Actions
+                html += '<th class="p-3 w-20 text-center">Actions</th>';
                 html += '</tr></thead>';
 
                 // BODY
@@ -1556,41 +2054,67 @@
                     html += '<tr><td colspan="100" class="p-12 text-center text-slate-400">Aucun résultat.</td></tr>';
                 } else {
                     reports.forEach(r => {
-                        const date = new Date(r.timestamp);
-                        const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                        try {
+                            const date = new Date(r.timestamp);
+                            const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                            const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-                        html += `<tr class="hover:bg-indigo-50/50 transition duration-150 group">`;
+                            html += `<tr class="hover:bg-indigo-50/50 transition duration-150 group">`;
 
-                        if (isAdmin) html += `<td class="p-3"><input type="checkbox" value="${r.id}" class="row-checkbox checkbox rounded text-indigo-600 focus:ring-indigo-500"></td>`;
+                            if (isAdmin) html += `<td class="p-3"><input type="checkbox" value="${r.id}" class="row-checkbox checkbox rounded text-indigo-600 focus:ring-indigo-500"></td>`;
 
-                        html += `<td class="p-3 text-slate-600 font-medium whitespace-nowrap">${dateStr} <span class="text-slate-400 text-xs">${timeStr}</span></td>`;
-                        html += `<td class="p-3 text-slate-600"><span class="px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold">${r.user || 'Guest'}</span></td>`;
+                            html += `<td class="p-3 text-slate-600 font-medium whitespace-nowrap">${dateStr} <span class="text-slate-400 text-xs">${timeStr}</span></td>`;
+                            html += `<td class="p-3 text-slate-600"><span class="px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold">${r.user || 'Guest'}</span></td>`;
 
-                        columns.forEach(c => {
-                            let val = r.values[c.id] || (c.id === 'formTitle' ? r.formTitle : '-');
+                            columns.forEach(c => {
+                                let val = r.values[c.id] || (c.id === 'formTitle' ? r.formTitle : '-');
 
-                            if (val && typeof val === 'string' && val.startsWith('data:image')) {
-                                val = `<div class="relative w-12 h-12 group/img">
-                                    <img src="${val}" class="w-full h-full object-cover rounded-lg border shadow-sm cursor-zoom-in" onclick="app.viewImage(this.src)">
-                                    <div class="absolute inset-0 bg-black/10 rounded-lg hidden group-hover/img:block pointer-events-none"></div>
-                                </div>`;
+                                if (val && typeof val === 'string') {
+                                    if (val.startsWith('data:image')) {
+                                        val = `<div class="relative w-12 h-12 group/img">
+                                            <img src="${val}" class="w-full h-full object-cover rounded-lg border shadow-sm cursor-zoom-in" onclick="app.viewImage(this.src)">
+                                            <div class="absolute inset-0 bg-black/10 rounded-lg hidden group-hover/img:block pointer-events-none"></div>
+                                        </div>`;
+                                    } else if (val.startsWith('[') && val.endsWith(']')) {
+                                        // Try Parse Table
+                                        try {
+                                            const json = JSON.parse(val);
+                                            val = `<span class="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">[Tableau: ${json.length} lignes]</span>`;
+                                        } catch (e) { }
+                                    }
+                                }
+
+                                html += `<td class="p-3 align-middle text-slate-700">${val}</td>`;
+                            });
+
+                            // Add Edit & Download Buttons
+                            html += `<td class="p-3 text-center flex items-center justify-center gap-2">`;
+
+                            // Download Button (For Everyone)
+                            html += `
+                                <button onclick="app.downloadSingleReport('${r.id}')" class="p-2 bg-white border border-slate-200 text-green-600 rounded-lg hover:bg-green-50 transition shadow-sm" title="Télécharger">
+                                    <i data-lucide="download" class="w-4 h-4"></i>
+                                </button>`;
+
+                            // CLONE BUTTON - ADDED HERE AS WELL
+                            html += `
+                                <button onclick="app.cloneReport('${r.id}')" class="p-2 bg-white border border-slate-200 text-indigo-600 rounded-lg hover:bg-indigo-50 transition shadow-sm ml-1" title="Dupliquer">
+                                    <i data-lucide="copy" class="w-4 h-4"></i>
+                                </button>`;
+
+                            if (isAdmin) {
+                                html += `
+                                <button onclick="app.editReport('${r.id}')" class="p-2 bg-white border border-slate-200 text-blue-600 rounded-lg hover:bg-blue-50 transition shadow-sm" title="Modifier">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>`;
                             }
 
-                            html += `<td class="p-3 align-middle text-slate-700">${val}</td>`;
-                        });
-
-                        // Add Edit Button
-                        if (isAdmin) {
-                            html += `
-                            <td class="p-3 text-center">
-                                <button onclick="app.editReport('${r.id}')" class="p-2 bg-white border border-slate-200 text-blue-600 rounded-lg hover:bg-blue-50 transition shadow-sm" title="Modifier le rapport">
-                                    <i data-lucide="pencil" class="w-4 h-4"></i>
-                                </button>
-                            </td>`;
+                            html += `</td>`;
+                            html += `</tr>`;
+                        } catch (renderErr) {
+                            console.error("Render Row Error", renderErr);
+                            html += `<tr><td colspan="100" class="p-2 bg-red-50 text-red-600 text-xs font-mono">Erreur d'affichage rapport: ${r.id} (${renderErr.message})</td></tr>`;
                         }
-
-                        html += `</tr>`;
                     });
                 }
                 html += '</tbody></table></div>';
@@ -2016,6 +2540,7 @@
                     if (f.parentId) document.getElementById('new-field-parent').value = f.parentId;
                 }
                 if (f.type === 'search_ref' && f.targetFormId) document.getElementById('new-field-target-form').value = f.targetFormId;
+                if (f.type === 'table') document.getElementById('new-field-table-cols').value = f.columnNames || '';
 
                 document.getElementById('btn-add-field').innerText = "Mettre à jour";
                 document.getElementById('btn-cancel-edit').classList.remove('hidden');
@@ -2029,6 +2554,7 @@
             resetFieldForm() {
                 document.getElementById('new-field-label').value = '';
                 document.getElementById('new-field-unit').value = '';
+                document.getElementById('new-field-table-cols').value = ''; // Reset Table Cols
                 document.getElementById('new-field-required').checked = false;
                 document.getElementById('btn-add-field').innerText = "Ajouter le Champ";
                 document.getElementById('btn-cancel-edit').classList.add('hidden');
@@ -2040,6 +2566,7 @@
                 const t = document.getElementById('new-field-type').value;
                 document.getElementById('dep-config').classList.toggle('hidden', t !== 'select');
                 document.getElementById('search-ref-config').classList.toggle('hidden', t !== 'search_ref');
+                document.getElementById('table-config').classList.toggle('hidden', t !== 'table'); // Toggle Table Config
 
                 if (t === 'search_ref') {
                     // Populate Target Forms
@@ -2065,6 +2592,7 @@
                 const t = document.getElementById('new-field-type').value;
                 const p = document.getElementById('new-field-parent').value;
                 const targetForm = document.getElementById('new-field-target-form').value;
+                const tableCols = document.getElementById('new-field-table-cols').value;
                 const globalListId = document.getElementById('new-field-global-list').value;
                 const req = document.getElementById('new-field-required').checked;
 
@@ -2094,6 +2622,9 @@
                     if (t === 'search_ref') f.targetFormId = targetForm;
                     else delete f.targetFormId;
 
+                    if (t === 'table') f.columnNames = tableCols;
+                    else delete f.columnNames;
+
                     this.editFieldIndex = null;
                 } else {
                     // CREATE NEW
@@ -2101,6 +2632,8 @@
                     if (u) field.unit = u;
                     if (t === 'select' && p) field.parentId = p;
                     if (t === 'search_ref') field.targetFormId = targetForm;
+                    if (t === 'table') field.columnNames = tableCols;
+                    if (t === 'table') field.columnNames = tableCols; // Save Table Cols
 
                     this.activeForm.fields.push(field);
 
@@ -2849,101 +3382,8 @@
                 this.renderFormFields(isRestore);
             },
 
-            renderFormFields(isRestore = false) {
-                const c = document.getElementById('renderer-fields');
-                let draftValues = {};
-                // Load draft if restoring OR if a draft exists for this form (auto-resume)
-                const savedMeta = JSON.parse(localStorage.getItem('hv_draft_meta') || '{}');
-                if (savedMeta.formId === this.activeForm.id) {
-                    try { draftValues = JSON.parse(localStorage.getItem('hv_draft') || '{}'); } catch (e) { }
-                }
-
-                c.innerHTML = this.activeForm.fields.map(f => {
-                    if (f.type === 'header') return `<h3 class="font-bold text-lg border-b pb-2 pt-4 border-slate-200 text-indigo-900">${f.label}</h3>`;
-
-                    let inputHtml = '';
-                    const loadedVal = draftValues[f.id] || '';
-
-                    if (f.type === 'select') {
-                        const disabled = f.parentId ? 'disabled' : '';
-                        inputHtml = `<select id="inp_${f.id}" class="input-base" ${disabled} onchange="app.handleFieldChange('${f.id}');"><option value="">Sélectionner...</option></select>`;
-                    } else if (f.type === 'search_ref') {
-                        // SEARCH REFERENCE FIELD
-                        inputHtml = `
-                        <div class="flex gap-2">
-                             <input type="text" id="inp_${f.id}" class="input-base font-mono uppercase" placeholder="Ex: NC_26_..." value="${loadedVal}" onchange="app.saveDraft()">
-                             <button onclick="app.searchReference('${f.id}', '${f.targetFormId}')" class="bg-indigo-600 text-white px-3 rounded-lg"><i data-lucide="search" class="w-5 h-5"></i></button>
-                        </div>
-                        <div id="ref-preview-${f.id}" class="mt-2 text-sm bg-slate-50 p-3 rounded border border-slate-200 hidden relative">
-                            <i data-lucide="link" class="w-4 h-4 text-slate-400 absolute top-2 right-2"></i>
-                            <div id="ref-content-${f.id}"></div>
-                        </div>
-                        `;
-                        // Auto-load preview if value exists
-                        if (loadedVal) setTimeout(() => app.searchReference(f.id, f.targetFormId, true), 500);
-
-                    } else if (f.type === 'image') {
-                        inputHtml = `
-                            <div class="space-y-2">
-                                <input type="file" id="inp_${f.id}" accept="image/*" capture="environment" class="hidden" onchange="app.handleImage(this, 'prev_${f.id}')">
-                                
-                                <div id="btn-group-${f.id}" class="${loadedVal ? 'hidden' : ''}">
-                                    <button type="button" onclick="app.saveDraft(); document.getElementById('inp_${f.id}').click()" 
-                                        class="w-full h-10 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 font-medium">
-                                        <i data-lucide="camera" class="w-5 h-5"></i> Prendre Photo
-                                    </button>
-                                </div>
-
-                                <div id="preview-group-${f.id}" class="relative ${loadedVal ? '' : 'hidden'}">
-                                    <img id="prev_${f.id}" src="${loadedVal}" class="img-preview mb-2">
-                                    <button type="button" onclick="app.removeImage('${f.id}')" 
-                                        class="w-full h-10 bg-red-50 text-red-600 border border-red-200 rounded-xl flex items-center justify-center gap-2 hover:bg-red-100 font-medium">
-                                        <i data-lucide="trash-2" class="w-5 h-5"></i> Supprimer & Reprendre
-                                    </button>
-                                </div>
-
-                                <input type="hidden" id="val_${f.id}" value="${loadedVal}">
-                            </div>
-                        `;
-                    } else if (f.type === 'auto_serial') {
-                        inputHtml = `<input type="text" id="inp_${f.id}" class="input-base bg-slate-100 font-mono text-slate-500" value="(Auto: NC_YY_USER_xxxx)" disabled>`;
-                    } else {
-                        const type = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text');
-                        inputHtml = `<input type="${type}" id="inp_${f.id}" class="input-base" value="${loadedVal}" oninput="app.saveDraft()" placeholder="...">`;
-                    }
-
-                    return `<div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">${f.label} ${f.unit ? `(${f.unit})` : ''} ${f.required ? '<span class="text-red-500">*</span>' : ''}</label>${inputHtml}</div>`;
-                }).join('');
-
-                // Initialize Independent Selects
-                this.activeForm.fields.filter(f => f.type === 'select' && !f.parentId).forEach(f => {
-                    this.populateSelect(f.id, 'root');
-                    if (draftValues[f.id]) {
-                        document.getElementById(`inp_${f.id}`).value = draftValues[f.id];
-                        this.handleFieldChange(f.id); // Trigger chain
-                    }
-                });
-
-                // Restore dependent selects
-                if (Object.keys(draftValues).length > 0) {
-                    this.activeForm.fields.filter(f => f.type === 'select' && f.parentId).forEach(f => {
-                        if (draftValues[f.parentId]) {
-                            // Wait for parent populate to finish (async-ish via UI thread)
-                            setTimeout(() => {
-                                const el = document.getElementById(`inp_${f.id}`);
-                                if (el && draftValues[f.id]) el.value = draftValues[f.id];
-                            }, 100);
-                        }
-                    });
-                }
-
-                // Set Date Defaults if empty
-                this.activeForm.fields.filter(f => f.type === 'date').forEach(f => {
-                    if (!draftValues[f.id]) document.getElementById(`inp_${f.id}`).valueAsDate = new Date();
-                });
-
-                lucide.createIcons();
-            },
+            // Duplicate renderFormFields removed.
+            // The correct version is defined above (line ~1167).
 
             // --- THEME INIT (Static) ---
             initTheme() {
@@ -3487,54 +3927,174 @@
                 }
             },
 
+            // GENERIC EXPORT (Updated for Selection Support & Multi-Sheet)
             exportExcel(containerId) {
                 try {
-                    if (typeof XLSX === 'undefined') {
-                        alert("Erreur Crud: La librairie Excel (XLSX) n'est pas chargée. Vérifiez votre connexion internet.");
-                        return;
+                    if (typeof XLSX === 'undefined') return alert("Erreur: Librairie XLSX manquante.");
+
+                    // ULTRA-ROBUST SELECTION
+                    const allChecked = document.querySelectorAll('input[type="checkbox"]:checked');
+                    let selectedIds = [];
+                    allChecked.forEach(cb => {
+                        if (cb.classList.contains('row-checkbox') || (cb.value && cb.value.length > 5)) {
+                            selectedIds.push(cb.value);
+                        }
+                    });
+                    selectedIds = [...new Set(selectedIds)];
+
+                    let reports;
+                    if (selectedIds.length > 0) {
+                        reports = this.data.reports.filter(r => selectedIds.includes(String(r.id)));
+                    } else {
+                        reports = this.getFilteredReports(containerId);
                     }
 
-                    const reports = this.getFilteredReports(containerId);
-                    if (!reports || reports.length === 0) return alert("Aucune donnée à exporter (Liste vide).");
+                    if (!reports || reports.length === 0) return alert("Aucune donnée (Selec: " + selectedIds.length + ")");
 
-                    // Flatten Data with Error Safety
-                    const data = reports.map(r => {
+                    // MULTI-SHEET EXPORT
+                    const sheets = { "GENEL": [] };
+
+                    // First pass: Table Fields
+                    reports.forEach(r => {
+                        const form = this.data.forms.find(f => f.id === r.formId);
+                        if (form) {
+                            form.fields.forEach(f => {
+                                if (f.type === 'table' || (f.columnNames && f.columnNames.length > 0)) {
+                                    if (!sheets[`TAB_${f.label}`]) sheets[`TAB_${f.label}`] = [];
+                                }
+                            });
+                        }
+                    });
+
+                    // Second pass: Data
+                    reports.forEach(r => {
                         try {
-                            const row = {
+                            const baseRow = {
                                 "ID": r.id,
-                                "Type": r.formTitle,
-                                "Date": new Date(r.timestamp).toLocaleDateString(),
+                                "Formulaire": r.formTitle,
+                                "Date Création": new Date(r.timestamp).toLocaleDateString(),
                                 "Heure": new Date(r.timestamp).toLocaleTimeString(),
                                 "Utilisateur": r.user || 'Inconnu'
                             };
 
                             const form = this.data.forms.find(f => f.id === r.formId);
+                            const rowMain = { ...baseRow };
+
                             if (form) {
                                 form.fields.forEach(f => {
                                     if (f.type === 'header') return;
-                                    let val = r.values[f.id] || '';
-                                    // AGGRESSIVE SANITIZER: Prevent 32k Limit Crash
-                                    if (typeof val === 'string' && val.length > 2000) val = "[Data Truncated for Excel]";
-                                    row[f.label] = val;
+                                    const val = r.values[f.id] || '';
+
+                                    const isTable = (f.type === 'table' || (f.columnNames && f.columnNames.length > 0));
+
+                                    if (isTable && typeof val === 'string' && val.startsWith('[')) {
+                                        try {
+                                            const tableRows = JSON.parse(val);
+                                            if (Array.isArray(tableRows) && tableRows.length > 0) {
+                                                rowMain[f.label] = `[Voir Onglet: TAB_${f.label}] (${tableRows.length} lignes)`;
+                                                tableRows.forEach((tr, i) => {
+                                                    sheets[`TAB_${f.label}`].push({
+                                                        "REF_RAPPORT_ID": r.id,
+                                                        "Ligne": i + 1,
+                                                        ...tr
+                                                    });
+                                                });
+                                            } else {
+                                                rowMain[f.label] = "(Vide)";
+                                            }
+                                        } catch (e) { rowMain[f.label] = "Erreur Données"; }
+                                    } else {
+                                        rowMain[f.label] = val;
+                                    }
                                 });
                             }
-                            return row;
-                        } catch (err) {
-                            console.error("Row Error", err);
-                            return { "Error": "Corrupt Data Row" };
+                            sheets["GENEL"].push(rowMain);
+                        } catch (err) { }
+                    });
+
+                    // Build Workbook
+                    const wb = XLSX.utils.book_new();
+                    const wsMain = XLSX.utils.json_to_sheet(sheets["GENEL"]);
+                    XLSX.utils.book_append_sheet(wb, wsMain, "GENEL");
+
+                    Object.keys(sheets).forEach(key => {
+                        if (key !== "GENEL" && sheets[key].length > 0) {
+                            const safeName = key.substring(0, 31).replace(/[\\/?*[\]]/g, '');
+                            const ws = XLSX.utils.json_to_sheet(sheets[key]);
+                            XLSX.utils.book_append_sheet(wb, ws, safeName);
                         }
                     });
 
-                    const ws = XLSX.utils.json_to_sheet(data);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Rapports");
                     const fname = `Export_HV_${new Date().toISOString().slice(0, 10)}.xlsx`;
                     XLSX.writeFile(wb, fname);
 
                 } catch (e) {
-                    alert("Erreur Export Excel: " + e.message);
-                    console.error("Export Error Stack:", e);
+                    alert("Erreur: " + e.message);
                 }
+            },
+
+            downloadSingleReport(reportId) {
+                const r = this.data.reports.find(x => x.id === reportId);
+                if (!r) return;
+
+                try {
+                    const sheets = { "GENEL": [] };
+                    const baseRow = {
+                        "ID": r.id,
+                        "Formulaire": r.formTitle,
+                        "Date": new Date(r.timestamp).toLocaleDateString(),
+                        "Heure": new Date(r.timestamp).toLocaleTimeString(),
+                        "Utilisateur": r.user || 'Inconnu'
+                    };
+
+                    const form = this.data.forms.find(f => f.id === r.formId);
+                    const rowMain = { ...baseRow };
+
+                    if (form) {
+                        form.fields.forEach(f => {
+                            if (f.type === 'header') return;
+                            const val = r.values[f.id] || '';
+                            const isTable = (f.type === 'table' || (f.columnNames && f.columnNames.length > 0));
+
+                            if (isTable && typeof val === 'string' && val.startsWith('[')) {
+                                try {
+                                    const tableRows = JSON.parse(val);
+                                    if (Array.isArray(tableRows) && tableRows.length > 0) {
+                                        rowMain[f.label] = `[Voir Onglet: TAB_${f.label}] (${tableRows.length} lignes)`;
+                                        if (!sheets[`TAB_${f.label}`]) sheets[`TAB_${f.label}`] = [];
+                                        tableRows.forEach((tr, i) => {
+                                            sheets[`TAB_${f.label}`].push({ "Ligne": i + 1, ...tr });
+                                        });
+                                    } else {
+                                        rowMain[f.label] = "(Vide)";
+                                    }
+                                } catch (e) { rowMain[f.label] = "Erreur Données"; }
+                            } else {
+                                rowMain[f.label] = val;
+                            }
+                        });
+                    }
+                    sheets["GENEL"].push(rowMain);
+
+                    const wb = XLSX.utils.book_new();
+                    const wsMain = XLSX.utils.json_to_sheet(sheets["GENEL"]);
+                    XLSX.utils.book_append_sheet(wb, wsMain, "GENEL");
+
+                    Object.keys(sheets).forEach(key => {
+                        if (key !== "GENEL" && sheets[key].length > 0) {
+                            const safeName = key.substring(0, 31).replace(/[\\/?*[\]]/g, '');
+                            const ws = XLSX.utils.json_to_sheet(sheets[key]);
+                            XLSX.utils.book_append_sheet(wb, ws, safeName);
+                        }
+                    });
+
+                    const safeTitle = r.formTitle.replace(/[^a-z0-9]/gi, '_');
+                    const safeUser = (r.user || 'Inconnu').replace(/[^a-z0-9]/gi, '_');
+                    const dateStr = new Date(r.timestamp).toLocaleDateString('fr-CA');
+                    const fname = `${safeTitle}_${safeUser}_${dateStr}.xlsx`;
+                    XLSX.writeFile(wb, fname);
+
+                } catch (e) { alert("Erreur: " + e.message); }
             },
 
             async generatePortableArchive() {
@@ -3600,7 +4160,7 @@
                                 // Image Logic
                                 if (f.type === 'image' && val) {
                                     const ext = 'jpg';
-                                    const filename = `${r.id.substring(0, 8)}_${f.id}.${ext}`;
+                                    const filename = `${String(r.id).substring(0, 8)}_${f.id}.${ext}`;
 
                                     if (typeof val === 'string' && val.startsWith('data:image')) {
                                         const base64Data = val.split(',')[1];
@@ -3900,6 +4460,37 @@
                             }
                         }
                     }
+
+                    // --- AUTO RESTORE BACKUPS (Emergency Recovery) ---
+                    try {
+                        const backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
+                        if (backups.length > 0) {
+                            // We need to write to hv_app_data directly because 'this.data' might not be fully loaded yet inside initTheme
+                            // But usually initTheme runs first. Let's try to update the raw JSON in localStorage.
+                            const currentRaw = localStorage.getItem('hv_app_data');
+                            if (currentRaw) {
+                                const currentData = JSON.parse(currentRaw);
+                                if (!currentData.reports) currentData.reports = [];
+
+                                let addedCount = 0;
+                                backups.forEach(b => {
+                                    if (!currentData.reports.find(r => r.id === b.id)) {
+                                        currentData.reports.unshift(b);
+                                        addedCount++;
+                                    }
+                                });
+
+                                if (addedCount > 0) {
+                                    console.log("RESTORED " + addedCount + " MISSING REPORTS!");
+                                    const newJson = JSON.stringify(currentData);
+                                    localStorage.setItem('hv_app_data', newJson);
+                                    localStorage.setItem('hv_app_v2', newJson);
+                                }
+                            }
+                        }
+                    } catch (restoreErr) {
+                        console.error("Auto-Restore Failed", restoreErr);
+                    }
                 } catch (e) { console.warn("Theme init error", e); }
             },
 
@@ -4119,6 +4710,91 @@
     </div>
     </div>
 
+    <!-- AUTO-REPAIR TOOL (V3.2 - Live Memory) -->
+    <script>
+        window.addEventListener('load', function () {
+            setTimeout(() => {
+                try {
+                    const backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
+                    if (backups.length === 0) return;
+
+                    // Wait for app to be ready
+                    if (typeof app === 'undefined' || !app.data || !app.data.reports) return;
+
+                    let addedCount = 0;
+                    backups.forEach(b => {
+                        if (!app.data.reports.find(r => r.id === b.id)) {
+                            app.data.reports.unshift(b);
+                            addedCount++;
+                        }
+                    });
+
+                    if (addedCount > 0) {
+                        // Refresh Dashboard but NO RELOAD
+                        if (app.renderUserDashboard && document.getElementById('user-dashboard') && !document.getElementById('user-dashboard').classList.contains('hidden')) {
+                            app.renderUserDashboard();
+                            alert("✅ " + addedCount + " Rapport(s) Restaurés (En Mémoire) !\nIls sont maintenant visibles dans votre liste.");
+                        } else {
+                            // Silent restore if dashboard is not active (user will see them later)
+                            console.log("Restored " + addedCount + " reports to memory.");
+                        }
+                    }
+                } catch (e) { console.error("Auto-Repair failed", e); }
+            }, 2000);
+        });
+    </script>
+</body>
+
+</html>
+setTimeout(() => {
+try {
+const backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
+if (backups.length === 0) return;
+
+let currentRaw = localStorage.getItem('hv_app_data');
+let currentData = currentRaw ? JSON.parse(currentRaw) : { reports: [] };
+if (!currentData.reports) currentData.reports = [];
+
+let addedCount = 0;
+backups.forEach(b => {
+if (!currentData.reports.find(r => r.id === b.id)) {
+currentData.reports.unshift(b);
+addedCount++;
+}
+});
+
+if (addedCount > 0) {
+const newJson = JSON.stringify(currentData);
+localStorage.setItem('hv_app_data', newJson);
+localStorage.setItem('hv_app_v2', newJson);
+
+alert("✅ SYSTÈME DE RÉCUPÉRATION :\n" + addedCount + " rapport(s) manquant(s) ont été restaurés depuis la sauvegarde
+!\n\nLa page va redémarrer.");
+window.location.reload();
+}
+} catch (e) { console.error("Auto-Repair failed", e); }
+}, 1000);
+});
+</script>
+setTimeout(() => {
+try {
+const lsData = JSON.parse(localStorage.getItem('hv_app_data') || '{}');
+const lsCount = (lsData.reports || []).length;
+
+const backupData = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
+const backupCount = backupData.length;
+
+const appCount = (typeof app !== 'undefined' && app.data && app.data.reports) ? app.data.reports.length : 'N/A';
+
+alert(`📢 DIAGNOSTIC V3.0\n\n1. Stockage Principal (LS): ${lsCount} rapports\n2. Système de Sauvegarde (Backup):
+${backupCount} rapports\n3. Mémoire de l'App: ${appCount} rapports\n\nSi le nombre "Backup" est plus grand que
+"Stockage Principal", la restauration automatique a échoué.`);
+} catch (e) {
+console.error("Diag failed", e);
+}
+}, 2000);
+});
+</script>
 </body>
 
 </html>
