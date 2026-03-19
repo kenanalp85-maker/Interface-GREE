@@ -4814,6 +4814,11 @@
                         app.data.reports = app.data.reports.filter(r => r.id !== id && String(r.id) !== String(id));
                         app.save();
 
+                        // 1.5 Delete from Cloud DB (Firebase)
+                        if (window.db) {
+                            window.db.collection('reports').doc(String(id)).delete().catch(err => console.error("Cloud Delete Fail", id, err));
+                        }
+
                         // 2. Delete from Backup Storage
                         try {
                             let backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
