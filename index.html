@@ -4565,6 +4565,14 @@
                 // Update ALL logo placeholders
                 document.querySelectorAll('.app-logo-container').forEach(el => el.innerHTML = logoHTML);
 
+                // Update Login Screen Logo
+                const loginLogo = document.getElementById('login-logo-container');
+                if (loginLogo) {
+                    loginLogo.innerHTML = c.appLogo
+                        ? `<img src="${c.appLogo}" class="w-32 h-32 object-contain rounded-xl bg-white/10 p-2">`
+                        : `<i data-lucide="zap" class="w-10 h-10 text-white"></i>`;
+                }
+
                 // Update Config Preview
                 const preview = document.getElementById('config-logo-preview');
                 if (preview) {
