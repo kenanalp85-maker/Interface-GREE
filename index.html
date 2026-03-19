@@ -1598,8 +1598,8 @@
 
                     alert("Succès ! Total Rapports: " + this.data.reports.length + "\n(Données Manuellement Écrites)");
 
-                    // FORCE RELOAD TO CLEAR ALL STATES & SHOW DATA
-                    window.location.reload();
+                    // FIX: Go back to menu instead of hard reload so Cloud Sync isn't interrupted
+                    this.showMenu();
 
                 } catch (mainErr) {
                     alert("Erreur critique: " + mainErr.message);
