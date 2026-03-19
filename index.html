@@ -175,7 +175,7 @@
         <div class="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden fade-in">
             <div class="bg-emerald-600 p-8 text-center transition-colors duration-300" id="login-header-bg">
                 <div class="flex justify-center mb-4">
-                    <div class="p-3 bg-white/20 rounded-full backdrop-blur-sm">
+                    <div id="login-logo-container" class="p-3 bg-white/20 rounded-full backdrop-blur-sm">
                         <i data-lucide="zap" class="w-10 h-10 text-white"></i>
                     </div>
                 </div>
@@ -641,6 +641,47 @@
                                 class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-900 flex items-center justify-center gap-2">
                                 <i data-lucide="upload" class="w-5 h-5"></i>
                                 Restaurer Sauvegarde
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- REPAIR TOOL (Sync Fix) -->
+                    <div class="mt-6 pt-6 border-t border-slate-100">
+                        <h4 class="font-bold text-sm mb-2 text-red-700 flex items-center gap-2">
+                            <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                            Dépannage (Rapports Fantômes/Zombies)
+                        </h4>
+                        <p class="text-xs text-slate-500 mb-3">
+                            CLIQUEZ SI DES RAPPORTS SUPPRIMÉS REVIENNENT (Pour forcer la synchronisation).
+                        </p>
+                        <button onclick="app.fixBackups()"
+                            class="w-full bg-red-50 text-red-700 border border-red-200 py-3 rounded-xl font-bold hover:bg-red-100 flex items-center justify-center gap-2 transition">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                            Réinitialiser la Sauvegarde
+                        </button>
+                    </div>
+
+                    <!-- STORAGE CHECK & CLEAN -->
+                    <div class="mt-4 pt-4 border-t border-slate-100">
+                        <h4 class="font-bold text-sm mb-2 text-indigo-700 flex items-center justify-between">
+                            <span><i data-lucide="hard-drive" class="w-4 h-4 inline mr-1"></i> Espace Disque
+                                (Local)</span>
+                            <span id="storage-percent" class="text-xs bg-slate-100 px-2 py-1 rounded">Calcul...</span>
+                        </h4>
+                        <div
+                            class="w-full bg-slate-100 rounded-full h-2.5 mb-2 overflow-hidden border border-slate-200">
+                            <div id="storage-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
+                                style="width: 0%"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="app.checkStorage()"
+                                class="flex-1 bg-white border border-slate-300 py-2 rounded text-xs font-bold hover:bg-slate-50 shadow-sm">
+                                <i data-lucide="refresh-cw" class="w-3 h-3 inline"></i> Analyser
+                            </button>
+                            <button onclick="app.cleanImages()"
+                                class="flex-1 bg-white border border-amber-300 text-amber-700 py-2 rounded text-xs font-bold hover:bg-amber-50 shadow-sm"
+                                title="Supprime les photos pour gagner de la place">
+                                <i data-lucide="image-off" class="w-3 h-3 inline"></i> Suppr. Photos
                             </button>
                         </div>
                     </div>
@@ -1523,7 +1564,16 @@
                 localStorage.removeItem('hv_draft');
                 localStorage.removeItem('hv_draft_meta');
 
-                // --- AUTO DOWNLOAD REMOVED BY USER REQUEST ---
+                // 3. CLOUD SYNC: PUSH SINGLE REPORT
+                if (window.db) {
+                    window.db.collection('reports').doc(String(newReport.id)).set(JSON.parse(JSON.stringify(newReport)))
+                        .then(() => console.log("Wizard Report Pushed to Cloud"))
+                        .catch(e => console.error("Wizard Report Push Error", e));
+
+                    // Also force sync master db to update Serial Count for everyone
+                    if (app.forceCloudSave) app.forceCloudSave();
+                }
+
                 // EMERGENCY BACKUP SYSTEM
                 try {
                     let backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
@@ -4788,6 +4838,29 @@
                     // CRITICAL: Override original delete function
                     app.deleteReport = app.wipeReport;
                     console.log("Delete logic upgraded to permanent wipe.");
+
+                    // --- NEW FIX BACKUPS TOOL ---
+                    app.fixBackups = function () {
+                        if (!confirm("ATTENTION : Cette action va synchroniser la sauvegarde avec l'écran actuel.\n\nLes rapports supprimés qui reviennent seront éliminés.\n\nContinuer ?")) return;
+
+                        try {
+                            // 1. Get visible active reports
+                            const current = app.data.reports || [];
+
+                            // 2. Wipe backup
+                            localStorage.removeItem('hv_reports_backup');
+
+                            // 3. Rewrite backup with current legitimate data
+                            localStorage.setItem('hv_reports_backup', JSON.stringify(current));
+
+                            // 4. Force Save Main Data
+                            app.save();
+
+                            alert("✅ SUCCÈS : Les 'rapports fantômes' ont été éliminés.\nLa sauvegarde est maintenant synchronisée.");
+                        } catch (e) {
+                            alert("Erreur: " + e.message);
+                        }
+                    };
                 }
             }, 500); // Wait for app init
         });
