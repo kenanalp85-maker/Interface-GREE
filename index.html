@@ -4511,36 +4511,7 @@
                         }
                     }
 
-                    // --- AUTO RESTORE BACKUPS (Emergency Recovery) ---
-                    try {
-                        const backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
-                        if (backups.length > 0) {
-                            // We need to write to hv_app_data directly because 'this.data' might not be fully loaded yet inside initTheme
-                            // But usually initTheme runs first. Let's try to update the raw JSON in localStorage.
-                            const currentRaw = localStorage.getItem('hv_app_data');
-                            if (currentRaw) {
-                                const currentData = JSON.parse(currentRaw);
-                                if (!currentData.reports) currentData.reports = [];
-
-                                let addedCount = 0;
-                                backups.forEach(b => {
-                                    if (!currentData.reports.find(r => r.id === b.id)) {
-                                        currentData.reports.unshift(b);
-                                        addedCount++;
-                                    }
-                                });
-
-                                if (addedCount > 0) {
-                                    console.log("RESTORED " + addedCount + " MISSING REPORTS!");
-                                    const newJson = JSON.stringify(currentData);
-                                    localStorage.setItem('hv_app_data', newJson);
-                                    localStorage.setItem('hv_app_v2', newJson);
-                                }
-                            }
-                        }
-                    } catch (restoreErr) {
-                        console.error("Auto-Restore Failed", restoreErr);
-                    }
+                    // --- AUTO RESTORE BACKUPS REMOVED (Cloud is now single truth source) ---
                 } catch (e) { console.warn("Theme init error", e); }
             },
 
@@ -4768,39 +4739,7 @@
     </div>
     </div>
 
-    <!-- AUTO-REPAIR TOOL (V3.2 - Live Memory) -->
-    <script>
-        window.addEventListener('load', function () {
-            setTimeout(() => {
-                try {
-                    const backups = JSON.parse(localStorage.getItem('hv_reports_backup') || '[]');
-                    if (backups.length === 0) return;
-
-                    // Wait for app to be ready
-                    if (typeof app === 'undefined' || !app.data || !app.data.reports) return;
-
-                    let addedCount = 0;
-                    backups.forEach(b => {
-                        if (!app.data.reports.find(r => r.id === b.id)) {
-                            app.data.reports.unshift(b);
-                            addedCount++;
-                        }
-                    });
-
-                    if (addedCount > 0) {
-                        // Refresh Dashboard but NO RELOAD
-                        if (app.renderUserDashboard && document.getElementById('user-dashboard') && !document.getElementById('user-dashboard').classList.contains('hidden')) {
-                            app.renderUserDashboard();
-                            alert("✅ " + addedCount + " Rapport(s) Restaurés (En Mémoire) !\nIls sont maintenant visibles dans votre liste.");
-                        } else {
-                            // Silent restore if dashboard is not active (user will see them later)
-                            console.log("Restored " + addedCount + " reports to memory.");
-                        }
-                    }
-                } catch (e) { console.error("Auto-Repair failed", e); }
-            }, 2000);
-        });
-    </script>
+    <!-- AUTO-REPAIR TOOL REMOVED (Cloud is now single truth source) -->
     <!-- WIPE REPORT LOGIC (Permanent Delete) -->
     <script>
         window.addEventListener('load', function () {
