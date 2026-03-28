@@ -488,6 +488,35 @@
                         <ul id="dm-options-list" class="space-y-1 max-h-60 overflow-y-auto"></ul>
                     </div>
                 </div>
+
+                <!-- NEW TASKS UPLOAD SECTION -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-6">
+                    <h2 class="font-bold text-lg mb-4 flex items-center gap-2 text-indigo-700">
+                        <i data-lucide="file-spreadsheet" class="w-5 h-5"></i> <span id="admin-task-section-title">Gestion Excel des Tâches</span>
+                    </h2>
+                    <p class="text-sm text-slate-500 mb-4">Chargez un fichier Excel pour créer un nouveau groupe de tâches.</p>
+                    
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3">
+                        <h4 class="font-bold text-sm">Nouveau Groupe</h4>
+                        <input type="text" id="new-task-group-title" placeholder="Titre du groupe (ex: Routine Mensuelle)" class="input-base h-10 w-full mb-2">
+                        <div class="text-xs font-bold text-slate-500 uppercase mb-1">Fichier Excel :</div>
+                        <input type="file" id="admin-task-upload" accept=".xlsx, .xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" onchange="app.handleTaskExcelSelect(this)">
+                        
+                        <div id="task-group-config" class="hidden space-y-3 mt-3 pt-3 border-t border-slate-200">
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Colonne pour Titre Principal :</label>
+                                <select id="task-group-title-col" class="input-base h-10 text-sm w-full"><option value="">Choisir...</option></select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Formulaire à Lier :</label>
+                                <select id="task-group-form" class="input-base h-10 text-sm w-full"><option value="">Choisir...</option></select>
+                            </div>
+                            <button onclick="app.saveTaskGroup()" class="w-full bg-indigo-600 text-white font-bold h-10 rounded-lg hover:bg-indigo-700">Enregistrer et Importer</button>
+                        </div>
+                    </div>
+
+                    <div id="admin-task-groups-list" class="space-y-3"></div>
+                </div>
             </div>
 
             <!-- 3. ARCHIVES -->
@@ -545,6 +574,10 @@
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Titre de l'App</label>
                             <input type="text" id="config-title" class="input-base" placeholder="Ex: Mesure HT">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nom Menu Tâches</label>
+                            <input type="text" id="config-task-name" class="input-base" placeholder="Ex: Tâches Assignées">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Couleur Thème</label>
@@ -760,6 +793,17 @@
                     <p class="text-sm text-slate-500">Voir les anciens rapports</p>
                 </div>
             </div>
+            
+            <div onclick="app.showUserTasks()"
+                class="bg-white p-6 rounded-2xl shadow-sm border border-indigo-200 cursor-pointer hover:shadow-md transition flex items-center gap-4 mt-4">
+                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><i
+                        data-lucide="list-todo" class="w-6 h-6"></i></div>
+                <div>
+                    <h3 class="font-bold" id="user-task-menu-title">Tâches Assignées</h3>
+                    <p class="text-sm text-slate-500">Liste des tâches à accomplir via Excel</p>
+                </div>
+            </div>
+
             <!-- License Secret (User Side too if needed, but mainly Admin requested) -->
             <div class="mt-8 text-center opacity-10 hover:opacity-100 transition-opacity duration-500">
                 <span id="user-license-secret" class="text-xs font-mono text-slate-400 cursor-help">.</span>
@@ -816,6 +860,32 @@
                 </div>
                 <div id="user-archive-table" class="border rounded-lg overflow-hidden"></div>
             </div>
+        </main>
+    </div>
+
+    <!-- USER TASKS SCREEN -->
+    <div id="user-tasks-screen" class="hidden min-h-screen fade-in">
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 h-16 flex items-center gap-4">
+            <button onclick="app.showMenu()" class="p-2 -ml-2"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+            <h1 class="font-bold text-lg" id="user-tasks-header">Tâches Assignées</h1>
+        </header>
+        <main class="max-w-7xl mx-auto p-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="filter" class="w-5 h-5 text-slate-400"></i>
+                        <h3 class="font-bold text-sm text-slate-700">Filtres</h3>
+                    </div>
+                </div>
+                <div id="dynamic-task-filters" class="flex flex-wrap gap-2">
+                    <!-- Dynamic dropdowns will be injected here -->
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="task-search-input" onkeyup="app.renderUserTasks()" placeholder="Rechercher partout..." class="input-base w-full h-10">
+                    <button onclick="app.resetTaskFilters()" class="px-4 bg-slate-100 text-slate-600 font-bold rounded text-sm hover:bg-slate-200 whitespace-nowrap border h-10">Réinitialiser</button>
+                </div>
+            </div>
+            <div id="user-tasks-list" class="space-y-8"></div>
         </main>
     </div>
 
@@ -951,9 +1021,11 @@
                     }
                 },
                 reports: [],
-                serial: { year: 26, count: 0 }
+                serial: { year: 26, count: 0 },
+                uploadedTasks: []
             },
             currentUser: null,
+            currentTaskData: null,
             activeForm: null,
 
             // --- INIT & PERSISTENCE ---
@@ -1328,7 +1400,25 @@
                         try { draftValues = JSON.parse(localStorage.getItem('hv_draft') || '{}'); } catch (e) { }
                     }
 
-                    c.innerHTML = this.activeForm.fields.map(f => this.renderSingleFieldHTML(f, draftValues[f.id])).join('');
+                    // --- TASK INJECTION ---
+                    let taskHtml = '';
+                    if (this.currentTaskData) {
+                        taskHtml = `<div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6 shadow-sm">
+                            <h3 class="font-bold text-indigo-900 border-b border-indigo-200 pb-2 mb-3 flex items-center gap-2">
+                                <i data-lucide="clipboard-check" class="w-5 h-5"></i> Görev Bilgileri (Salt Okunur)
+                            </h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                ${Object.keys(this.currentTaskData).map(k => `
+                                    <div class="bg-white p-2 text-sm rounded border border-indigo-100 flex flex-col">
+                                        <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">${k}</span>
+                                        <span class="text-slate-800 font-medium break-words">${this.currentTaskData[k]}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>`;
+                    }
+
+                    c.innerHTML = taskHtml + this.activeForm.fields.map(f => this.renderSingleFieldHTML(f, draftValues[f.id])).join('');
 
                     // Init Selects & Logic
                     this.activeForm.fields.filter(f => f.type === 'select' && !f.parentId).forEach(f => {
@@ -1365,11 +1455,20 @@
                 } else if (f.type === 'image') {
                     inputHtml = `
                         <div class="space-y-2">
-                            <input type="file" id="inp_${f.id}" accept="image/*" capture="environment" class="hidden" onchange="app.handleImage(this, 'prev_${f.id}')">
-                            <button type="button" onclick="document.getElementById('inp_${f.id}').click()" class="w-full h-10 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 font-medium">
-                                <i data-lucide="camera" class="w-5 h-5"></i> Prendre Photo
-                            </button>
-                            <img id="prev_${f.id}" src="${val}" class="${val ? '' : 'hidden'} img-preview">
+                            <input type="file" id="inp_cam_${f.id}" accept="image/*" capture="environment" class="hidden" onchange="app.handleImage(this, 'prev_${f.id}')">
+                            <input type="file" id="inp_gal_${f.id}" accept="image/*" class="hidden" onchange="app.handleImage(this, 'prev_${f.id}')">
+                            <div id="btn-group-${f.id}" class="${val ? 'hidden' : ''} grid grid-cols-2 gap-2">
+                                <button type="button" onclick="document.getElementById('inp_cam_${f.id}').click()" class="h-10 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center gap-1 hover:bg-indigo-50 font-medium transition text-[13px] sm:text-sm">
+                                    <i data-lucide="camera" class="w-4 h-4"></i> Caméra
+                                </button>
+                                <button type="button" onclick="document.getElementById('inp_gal_${f.id}').click()" class="h-10 border-2 border-dashed border-slate-200 text-slate-600 rounded-xl flex items-center justify-center gap-1 hover:bg-slate-50 font-medium transition text-[13px] sm:text-sm">
+                                    <i data-lucide="image" class="w-4 h-4"></i> Galerie
+                                </button>
+                            </div>
+                            <div id="preview-group-${f.id}" class="${val ? '' : 'hidden'} relative group">
+                                <img id="prev_${f.id}" src="${val}" class="img-preview shadow-sm cursor-zoom-in" onclick="app.viewImage(this.src)" onerror="this.src=''">
+                                <button type="button" onclick="app.removeImage('${f.id}')" class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 hidden group-hover:block transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
                             <input type="hidden" id="val_${f.id}" value="${val}">
                         </div>`;
                 } else if (f.type === 'auto_serial') {
@@ -1549,13 +1648,29 @@
                     formTitle: this.activeForm.title,
                     timestamp: new Date().toISOString(),
                     user: this.currentUser ? this.currentUser.name : 'Guest',
-                    values: formData
+                    values: formData,
+                    originalTaskData: this.currentTaskData ? this.currentTaskData : null
                 };
 
                 this.data.reports.unshift(newReport);
                 // Auto Serial Update
                 if (this.activeForm.fields.find(f => f.type === 'auto_serial')) {
                     this.data.serial.count++;
+                }
+
+                let wasWizardTask = false;
+                // Remove completed task
+                if (this.currentTaskGroupId && this.currentTaskId) {
+                    wasWizardTask = true;
+                    if (this.currentTaskGroupId === 'legacy_group') {
+                        this.data.uploadedTasks = this.data.uploadedTasks.filter(t => t.id !== this.currentTaskId);
+                    } else if (this.data.taskGroups) {
+                        const group = this.data.taskGroups.find(g => g.id === this.currentTaskGroupId);
+                        if (group) group.tasks = group.tasks.filter(t => t.id !== this.currentTaskId);
+                    }
+                    this.currentTaskData = null;
+                    this.currentTaskGroupId = null;
+                    this.currentTaskId = null;
                 }
 
                 this.save();
@@ -1599,7 +1714,12 @@
                     alert("Succès ! Total Rapports: " + this.data.reports.length + "\n(Données Manuellement Écrites)");
 
                     // FIX: Go back to menu instead of hard reload so Cloud Sync isn't interrupted
-                    this.showMenu();
+                    document.getElementById('form-renderer').classList.add('hidden');
+                    if (wasWizardTask) {
+                        this.showUserTasks();
+                    } else {
+                        this.showMenu();
+                    }
 
                 } catch (mainErr) {
                     alert("Erreur critique: " + mainErr.message);
@@ -1708,7 +1828,8 @@
                     formTitle: this.activeForm.title,
                     timestamp: new Date().toISOString(),
                     user: this.currentUser ? this.currentUser.name : 'Guest',
-                    values: {}
+                    values: {},
+                    originalTaskData: this.currentTaskData ? this.currentTaskData : null
                 };
 
                 let valid = true;
@@ -1735,6 +1856,20 @@
                 if (!valid) return alert("Veuillez remplir les champs obligatoires.");
 
                 this.data.reports.push(formData);
+
+                // Remove completed task
+                if (this.currentTaskGroupId && this.currentTaskId) {
+                    if (this.currentTaskGroupId === 'legacy_group') {
+                        this.data.uploadedTasks = this.data.uploadedTasks.filter(t => t.id !== this.currentTaskId);
+                    } else if (this.data.taskGroups) {
+                        const group = this.data.taskGroups.find(g => g.id === this.currentTaskGroupId);
+                        if (group) group.tasks = group.tasks.filter(t => t.id !== this.currentTaskId);
+                    }
+                    this.currentTaskData = null;
+                    this.currentTaskGroupId = null;
+                    this.currentTaskId = null;
+                }
+
                 this.save();
 
                 // NEW: Clear Draft
@@ -1884,6 +2019,9 @@
                 document.querySelectorAll('.admin-tab').forEach(t => t.classList.add('hidden'));
                 document.getElementById(id).classList.remove('hidden');
 
+                if (id === 'tab-forms') {
+                    this.renderAdminTaskGroups();
+                }
                 if (id === 'tab-archive') {
                     this.populateArchiveFilter('archive-form-filter');
                     this.renderArchive('admin-archive-table');
@@ -1891,6 +2029,7 @@
                 if (id === 'tab-settings') {
                     // Populate Settings
                     document.getElementById('config-title').value = this.data.config.appTitle || '';
+                    document.getElementById('config-task-name').value = this.data.config.taskMenuName || '';
                     document.getElementById('config-color').value = this.data.config.themeColor || '#4f46e5';
 
                     const emailList = this.data.config.emails || [this.data.config.email];
@@ -2120,10 +2259,13 @@
                                 let val = r.values[c.id] || (c.id === 'formTitle' ? r.formTitle : '-');
 
                                 if (val && typeof val === 'string') {
-                                    if (val.startsWith('data:image')) {
-                                        val = `<div class="relative w-12 h-12 group/img">
-                                            <img src="${val}" class="w-full h-full object-cover rounded-lg border shadow-sm cursor-zoom-in" onclick="app.viewImage(this.src)">
-                                            <div class="absolute inset-0 bg-black/10 rounded-lg hidden group-hover/img:block pointer-events-none"></div>
+                                    if (val.startsWith('data:image') || val.startsWith('http')) {
+                                        val = `<div class="relative w-14 h-14 group/img mt-1">
+                                            <img src="${val}" class="w-full h-full object-cover rounded-lg border border-slate-200 shadow-sm cursor-zoom-in" onclick="app.viewImage(this.src)">
+                                            <div class="absolute inset-0 bg-black/40 rounded-lg hidden group-hover/img:flex items-center justify-center gap-1.5 pointer-events-auto backdrop-blur-sm transition">
+                                                <button onclick="app.viewImage('${val}')" class="p-1.5 bg-white text-indigo-600 rounded-md drop-shadow-md hover:bg-indigo-50 hover:scale-110 transition"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+                                                <button onclick="app.downloadImage('${val}', 'photo_${r.id}_${c.id}.jpg')" class="p-1.5 bg-white text-green-600 rounded-md drop-shadow-md hover:bg-green-50 hover:scale-110 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i></button>
+                                            </div>
                                         </div>`;
                                     } else if (val.startsWith('[') && val.endsWith(']')) {
                                         // Try Parse Table
@@ -2426,6 +2568,7 @@
             // --- ADMIN: CONFIG & USERS ---
             saveConfig() {
                 const title = document.getElementById('config-title').value;
+                const taskName = document.getElementById('config-task-name').value;
                 const color = document.getElementById('config-color').value;
 
                 // Get 3 emails
@@ -2438,6 +2581,7 @@
                 this.data.config.email = e1;
 
                 if (title) this.data.config.appTitle = title;
+                if (taskName) this.data.config.taskMenuName = taskName;
                 if (color) this.data.config.themeColor = color;
 
                 this.save();
@@ -3307,6 +3451,12 @@
                 const mainContainer = document.getElementById('user-forms-grid');
                 if (!mainContainer) return;
 
+                const customName = this.data.config.taskMenuName || 'Tâches Assignées';
+                const menuTitle = document.getElementById('user-task-menu-title');
+                if (menuTitle) menuTitle.innerText = customName;
+                const tasksHeader = document.getElementById('user-tasks-header');
+                if (tasksHeader) tasksHeader.innerText = customName;
+
                 // Container Style
                 mainContainer.className = "flex flex-col gap-8 fade-in pb-12";
 
@@ -3409,8 +3559,11 @@
                 this.renderFormFields();
             },
             showMenu() {
-                const screens = ['admin-screen', 'user-menu', 'form-renderer', 'user-archive'];
+                const screens = ['admin-screen', 'user-menu', 'form-renderer', 'user-archive', 'user-tasks-screen'];
                 screens.forEach(s => document.getElementById(s).classList.add('hidden'));
+
+                // clear any read-only task if user goes back
+                this.currentTaskData = null;
 
                 if (this.currentUser.role === 'admin') {
                     document.getElementById('admin-screen').classList.remove('hidden');
@@ -3452,7 +3605,17 @@
                             }
 
                             // 2. Title
-                            if (c.appTitle) {
+                            if (c.taskMenuTitle) {
+                                document.getElementById('user-task-menu-title').innerText = c.taskMenuTitle;
+                                document.getElementById('admin-task-section-title').innerText = c.taskMenuTitle;
+                                document.getElementById('user-tasks-header').innerText = c.taskMenuTitle;
+                            }
+                            if (c.taskMenuTitle) {
+                    const el1 = document.getElementById('user-task-menu-title'); if(el1) el1.innerText = c.taskMenuTitle;
+                    const el2 = document.getElementById('admin-task-section-title'); if(el2) el2.innerText = c.taskMenuTitle;
+                    const el3 = document.getElementById('user-tasks-header'); if(el3) el3.innerText = c.taskMenuTitle;
+                }
+                if (c.appTitle) {
                                 document.querySelectorAll('.app-title-text').forEach(el => el.innerText = c.appTitle);
                                 document.title = c.appTitle;
                             }
@@ -3544,7 +3707,7 @@
                     const file = input.files[0];
                     const url = URL.createObjectURL(file);
                     const img = new Image();
-                    const fieldId = input.id.replace('inp_', '');
+                    const fieldId = previewId.replace('prev_', '');
 
                     // UI Loading State
                     const btnGroup = document.getElementById('btn-group-' + fieldId);
@@ -3627,7 +3790,10 @@
 
             removeImage(fieldId) {
                 // Clear Values
-                document.getElementById('inp_' + fieldId).value = ''; // Clear file input
+                const inpCam = document.getElementById('inp_cam_' + fieldId);
+                const inpGal = document.getElementById('inp_gal_' + fieldId);
+                if (inpCam) inpCam.value = '';
+                if (inpGal) inpGal.value = '';
                 document.getElementById('val_' + fieldId).value = ''; // Clear hidden data
                 document.getElementById('prev_' + fieldId).src = '';  // Clear img src
 
@@ -3654,7 +3820,8 @@
                         ? (this.data.reports.find(r => r.id === this.editingReportId).timestamp)
                         : new Date().toISOString(),
                     user: this.currentUser ? this.currentUser.name : 'Guest',
-                    values: {}
+                    values: {},
+                    taskData: this.currentTaskData || null
                 };
 
                 let valid = true;
@@ -3756,8 +3923,23 @@
                     this.data.reports.push(formData);
                 }
 
+                let wasTask = false;
+                // Remove completed task
+                if (!this.editingReportId && this.currentTaskGroupId && this.currentTaskId) {
+                    wasTask = true;
+                    if (this.currentTaskGroupId === 'legacy_group') {
+                        this.data.uploadedTasks = this.data.uploadedTasks.filter(t => t.id !== this.currentTaskId);
+                    } else if (this.data.taskGroups) {
+                        const group = this.data.taskGroups.find(g => g.id === this.currentTaskGroupId);
+                        if (group) group.tasks = group.tasks.filter(t => t.id !== this.currentTaskId);
+                    }
+                    this.currentTaskGroupId = null;
+                    this.currentTaskId = null;
+                }
+
                 this.save();       // Save everything
                 this.clearDraft(); // Clear draft
+                this.currentTaskData = null; // Clear active task
 
                 // 3. CLOUD SYNC: PUSH SINGLE REPORT
                 if (window.db) {
@@ -3796,7 +3978,12 @@
                     }
                 }
 
-                this.showMenu();
+                document.getElementById('form-renderer').classList.add('hidden');
+                if (wasTask) {
+                    this.showUserTasks();
+                } else {
+                    this.showMenu();
+                }
             },
 
             // --- SEARCH REFERENCE LOGIC ---
@@ -4030,6 +4217,17 @@
                             const form = this.data.forms.find(f => f.id === r.formId);
                             const rowMain = { ...baseRow };
 
+                            // Append Task Data BEFORE Form Fields
+                            if (r.taskData) {
+                                Object.keys(r.taskData).forEach(k => {
+                                    rowMain["[Task] " + k] = r.taskData[k];
+                                });
+                            } else if (r.originalTaskData) {
+                                Object.keys(r.originalTaskData).forEach(k => {
+                                    rowMain["[Task] " + k] = r.originalTaskData[k];
+                                });
+                            }
+
                             if (form) {
                                 form.fields.forEach(f => {
                                     if (f.type === 'header') return;
@@ -4058,6 +4256,7 @@
                                     }
                                 });
                             }
+
                             sheets["GENEL"].push(rowMain);
                         } catch (err) { }
                     });
@@ -4188,6 +4387,17 @@
 
                         // 1. Headers for this Sheet
                         const headers = ["ID", "Date", "Heure", "Utilisateur"];
+                        
+                        // Extract unique task data keys
+                        let taskDataKeys = new Set();
+                        group.forEach(r => {
+                            if(r.taskData) Object.keys(r.taskData).forEach(k => taskDataKeys.add(k));
+                        });
+                        let taskDataKeysArray = Array.from(taskDataKeys);
+                        
+                        // ADD TASK HEADERS FIRST
+                        taskDataKeysArray.forEach(k => headers.push("[Task] " + k));
+
                         const fieldIds = []; // Store order
 
                         if (formDef) {
@@ -4198,11 +4408,15 @@
                                 }
                             });
                         }
+                        
                         sheetRows.push(headers);
 
                         // 2. Rows for this Sheet
                         for (const r of group) {
                             const row = [r.id, new Date(r.timestamp).toLocaleDateString(), new Date(r.timestamp).toLocaleTimeString(), r.user];
+
+                            // Append task data to row FIRST
+                            taskDataKeysArray.forEach(k => row.push(r.taskData ? (r.taskData[k] || '') : ''));
 
                             fieldIds.forEach(f => {
                                 let val = r.values[f.id] || '';
@@ -4221,6 +4435,7 @@
 
                                 row.push(val);
                             });
+                            
                             sheetRows.push(row);
 
                             processedCount++;
@@ -4456,6 +4671,424 @@
 
 
 
+            // --- NEW TASK MANAGEMENT LOGIC ---
+            
+            handleTaskExcelSelect(input) {
+                if (!input.files || !input.files[0]) return;
+                const file = input.files[0];
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        if (typeof XLSX === 'undefined') throw new Error("XLSX lib missing.");
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+                        if (jsonData.length === 0) throw new Error("Fichier vide");
+                        
+                        this.pendingTaskData = jsonData;
+                        const cols = Object.keys(jsonData[0] || {});
+                        
+                        // Populate Column Dropdown
+                        const colSelect = document.getElementById('task-group-title-col');
+                        colSelect.innerHTML = '<option value="">Choisir la colonne...</option>' + cols.map(c => `<option value="${c}">${c}</option>`).join('');
+                        
+                        // Populate Forms Dropdown
+                        const formSelect = document.getElementById('task-group-form');
+                        formSelect.innerHTML = '<option value="">Choisir le formulaire...</option>' + (this.data.forms || []).map(f => `<option value="${f.id}">${f.title}</option>`).join('');
+                        
+                        // Show config UI
+                        document.getElementById('task-group-config').classList.remove('hidden');
+                        
+                    } catch(err) { alert("Erreur: "+err.message); input.value = ''; }
+                };
+                reader.readAsArrayBuffer(file);
+            },
+
+            saveTaskGroup() {
+                const title = document.getElementById('new-task-group-title').value.trim();
+                const titleCol = document.getElementById('task-group-title-col').value;
+                const formId = document.getElementById('task-group-form').value;
+                
+                if(!title || !titleCol || !formId || !this.pendingTaskData) {
+                    return alert("Veuillez remplir tous les champs et charger un fichier Excel.");
+                }
+                
+                if (!this.data.taskGroups) this.data.taskGroups = [];
+                
+                const newGroup = {
+                    id: 'tgroup_' + Date.now(),
+                    title: title,
+                    titleCol: titleCol,
+                    formId: formId,
+                    tasks: this.pendingTaskData.map((row, i) => ({
+                        id: 'task_' + Date.now() + "_" + i,
+                        data: row,
+                        status: 'pending'
+                    }))
+                };
+                
+                this.data.taskGroups.push(newGroup);
+                this.save();
+                
+                // Reset UI
+                document.getElementById('new-task-group-title').value = '';
+                document.getElementById('task-group-title-col').innerHTML = '<option value="">Choisir...</option>';
+                document.getElementById('task-group-form').innerHTML = '<option value="">Choisir...</option>';
+                document.getElementById('admin-task-upload').value = '';
+                document.getElementById('task-group-config').classList.add('hidden');
+                this.pendingTaskData = null;
+                
+                this.renderAdminTaskGroups();
+                alert(`Groupe "${title}" créé avec ${newGroup.tasks.length} tâches !`);
+            },
+            
+            exportTaskGroup(groupId) {
+                let group = null;
+                if (groupId === 'legacy_group') {
+                    group = { id: 'legacy_group', title: 'Anciennes_Taches', tasks: this.data.uploadedTasks || [] };
+                } else {
+                    group = this.data.taskGroups.find(g => g.id === groupId);
+                }
+                if (!group) return;
+                if (!group.tasks || group.tasks.length === 0) return alert("Aucune tâche dans ce groupe.");
+                
+                if (typeof XLSX === 'undefined') return alert("Erreur: Librairie XLSX manquante.");
+
+                const wsData = group.tasks.map(t => t.data);
+                const ws = XLSX.utils.json_to_sheet(wsData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Tâches");
+                XLSX.writeFile(wb, `Taches_${group.title}_restantes.xlsx`);
+            },
+            
+            deleteTaskGroup(groupId) {
+                if(confirm("Supprimer ce groupe de tâches ?\nCela libérera de la mémoire de l'appareil.")) {
+                    if (groupId === 'legacy_group') {
+                        this.data.uploadedTasks = [];
+                    } else {
+                        this.data.taskGroups = this.data.taskGroups.filter(g => g.id !== groupId);
+                    }
+                    this.save();
+                    this.renderAdminTaskGroups();
+                    alert("Liste supprimée avec succès.");
+                }
+            },
+
+            updateTaskGroupExcel(input, groupId) {
+                if (!input.files || !input.files[0]) return;
+                const file = input.files[0];
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        if (typeof XLSX === 'undefined') throw new Error("XLSX lib missing.");
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+                        if (jsonData.length === 0) throw new Error("Fichier vide");
+
+                        if (groupId === 'legacy_group') {
+                            this.data.uploadedTasks = jsonData.map((row, i) => ({
+                                id: Date.now() + i,
+                                data: row
+                            }));
+                        } else {
+                            const group = this.data.taskGroups.find(g => g.id === groupId);
+                            if (!group) throw new Error("Groupe introuvable");
+                            group.tasks = jsonData.map((row, i) => ({
+                                id: Date.now() + i,
+                                data: row
+                            }));
+                        }
+
+                        this.save();
+                        this.renderAdminTaskGroups();
+                        alert("Mise à jour réussie avec le nouveau fichier Excel !");
+                    } catch(err) { 
+                        alert("Erreur: " + err.message); 
+                    } finally {
+                        input.value = '';
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            },
+            
+            renderAdminTaskGroups() {
+                const container = document.getElementById('admin-task-groups-list');
+                if(!container) return;
+                
+                let groups = this.data.taskGroups || [];
+                if (this.data.uploadedTasks && this.data.uploadedTasks.length > 0) {
+                    groups = [{
+                        id: 'legacy_group',
+                        title: 'Anciennes Tâches',
+                        tasks: this.data.uploadedTasks,
+                        titleCol: 'Manuel'
+                    }, ...groups];
+                }
+
+                if(groups.length === 0) {
+                    container.innerHTML = '<div class="text-xs text-slate-500 italic">Aucun groupe de tâches.</div>';
+                    return;
+                }
+                
+                container.innerHTML = groups.map(g => `
+                    <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex justify-between items-center">
+                        <div class="truncate mr-4 flex-1">
+                            <h4 class="font-bold text-indigo-800 text-sm truncate">${g.title}</h4>
+                            <p class="text-xs text-indigo-600 truncate">${g.tasks.length} tâches | Col Titre: ${g.titleCol}</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="document.getElementById('update-excel-${g.id}').click()" class="p-2 text-blue-600 bg-white border border-blue-200 hover:bg-blue-50 rounded-md shadow-sm" title="Mettre à jour Excel"><i data-lucide="upload" class="w-4 h-4"></i></button>
+                            <input type="file" id="update-excel-${g.id}" accept=".xlsx, .xls" class="hidden" onchange="app.updateTaskGroupExcel(this, '${g.id}')">
+                            <button onclick="app.exportTaskGroup('${g.id}')" class="p-2 text-green-600 bg-white border border-green-200 hover:bg-green-50 rounded-md shadow-sm" title="Exporter vers Excel"><i data-lucide="download" class="w-4 h-4"></i></button>
+                            <button onclick="app.deleteTaskGroup('${g.id}')" class="p-2 text-red-500 bg-white border border-red-200 hover:bg-red-50 rounded-md shadow-sm" title="Supprimer la liste"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            },
+
+            showUserTasks() {
+                document.getElementById('user-menu').classList.add('hidden');
+                document.getElementById('user-tasks-screen').classList.remove('hidden');
+                
+                // Initialize filters state
+                this.activeTaskFilters = {};
+                this.renderUserTasks(true); // true = rebuild filter UI
+            },
+            
+            resetTaskFilters() {
+                this.activeTaskFilters = {};
+                document.getElementById('task-search-input').value = '';
+                // Resets all selects
+                document.querySelectorAll('.task-filter-select').forEach(s => s.value = '');
+                this.renderUserTasks(false);
+            },
+            
+            onTaskFilterChange(colName, value) {
+                if(value) {
+                    this.activeTaskFilters[colName] = value;
+                } else {
+                    delete this.activeTaskFilters[colName];
+                }
+                this.renderUserTasks(false);
+            },
+
+            
+            showTaskGroupDetail(groupId) {
+                this.focusedTaskGroupId = groupId;
+                this.resetTaskFilters(); // calls renderUserTasks internally
+            },
+
+            backToTaskGroups() {
+                this.focusedTaskGroupId = null;
+                this.renderUserTasks(true);
+            },
+
+            renderUserTasks(rebuildFilters = false) {
+                const container = document.getElementById('user-tasks-list');
+                const filtersContainer = document.getElementById('dynamic-task-filters');
+                const searchEl = document.getElementById('task-search-input');
+                const term = searchEl ? searchEl.value.toLowerCase() : '';
+                
+                let allGroups = this.data.taskGroups || [];
+                
+                if(this.data.uploadedTasks && this.data.uploadedTasks.length > 0) {
+                    allGroups = [{
+                        id: 'legacy_group',
+                        title: 'Anciennes Tâches',
+                        titleCol: Object.keys(this.data.uploadedTasks[0].data)[0],
+                        formId: this.data.forms && this.data.forms.length > 0 ? this.data.forms[0].id : '',
+                        tasks: this.data.uploadedTasks
+                    }, ...allGroups];
+                }
+
+                if (allGroups.length === 0) {
+                    container.innerHTML = `<div class="border p-6 rounded-2xl text-center bg-slate-50 text-slate-500 italic">Aucune tâche assignée.</div>`;
+                    if(filtersContainer) filtersContainer.innerHTML = '';
+                    return;
+                }
+                
+                // IF NO GROUP FOCUSED -> Show List of Groups (Categories)
+                if(!this.focusedTaskGroupId) {
+                    if(filtersContainer) filtersContainer.innerHTML = '';
+                    
+                    let groupsHtml = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+                    allGroups.forEach(g => {
+                        groupsHtml += `
+                        <div onclick="app.showTaskGroupDetail('${g.id}')" class="bg-white p-6 rounded-xl border border-indigo-200 cursor-pointer hover:shadow-lg hover:border-indigo-400 transition flex items-center justify-between group">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition">
+                                    <i data-lucide="folders" class="w-6 h-6"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-lg text-slate-800">${g.title}</h3>
+                                    <p class="text-sm text-slate-500">${g.tasks.length} tâches en attente</p>
+                                </div>
+                            </div>
+                            <i data-lucide="chevron-right" class="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition"></i>
+                        </div>
+                        `;
+                    });
+                    groupsHtml += '</div>';
+                    container.innerHTML = groupsHtml;
+                    lucide.createIcons();
+                    return;
+                }
+                
+                // IF GROUP IS FOCUSED -> Show Tasks of that group
+                let g = allGroups.find(gr => gr.id === this.focusedTaskGroupId);
+                if(!g) return this.backToTaskGroups();
+                
+                let tasks = g.tasks;
+                
+                // Extract unique columns for filtering this group ONLY
+                let allCols = new Set();
+                let colValues = {};
+                
+                tasks.forEach(t => {
+                    Object.keys(t.data).forEach(k => {
+                        if(String(k).trim() === '') return;
+                        allCols.add(k);
+                        if(!colValues[k]) colValues[k] = new Set();
+                        if(t.data[k]) colValues[k].add(t.data[k]);
+                    });
+                });
+                
+                // 1. Build Extracted Filters UI
+                if(rebuildFilters && filtersContainer) {
+                    let filterHTML = `<button onclick="app.backToTaskGroups()" class="flex-shrink-0 h-10 px-4 rounded-lg text-white bg-slate-800 border-slate-700 font-bold text-sm hover:bg-slate-900 flex items-center gap-2 shadow-md mr-4"><i data-lucide="folder-output" class="w-4 h-4"></i> Quitter</button>`;
+                    const colsArray = Array.from(allCols).slice(0, 10);
+                    
+                    colsArray.forEach(c => {
+                        if(colValues[c].size > 0 && colValues[c].size < 50) { 
+                            const opts = Array.from(colValues[c]).sort();
+                            filterHTML += `
+                                <div class="flex-shrink-0">
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1 truncate max-w-[120px]" title="${c}">${c}</label>
+                                    <select class="input-base h-8 text-xs py-0 w-32 task-filter-select" onchange="app.onTaskFilterChange('${c.replace(/'/g, "\'")}', this.value)">
+                                        <option value="">Tous</option>
+                                        ${opts.map(o => `<option value="${o}">${o}</option>`).join('')}
+                                    </select>
+                                </div>
+                            `;
+                        }
+                    });
+                    filtersContainer.innerHTML = filterHTML;
+                }
+                
+                // 2. Apply filters
+                if (term) {
+                    tasks = tasks.filter(t => Object.values(t.data).some(v => String(v).toLowerCase().includes(term)));
+                }
+                
+                if (this.activeTaskFilters && Object.keys(this.activeTaskFilters).length > 0) {
+                    tasks = tasks.filter(t => {
+                        let matchAll = true;
+                        for (let col in this.activeTaskFilters) {
+                            if (t.data[col] != this.activeTaskFilters[col]) {
+                                matchAll = false;
+                                break;
+                            }
+                        }
+                        return matchAll;
+                    });
+                }
+                
+                // 3. Render filtered tasks
+                let html = `
+                <div class="mb-4">
+                    <div class="flex items-center gap-3 mb-4 border-b border-slate-200 pb-2">
+                        <h3 class="font-bold text-xl text-indigo-800">${g.title}</h3>
+                        <span class="bg-indigo-100 text-indigo-700 text-sm px-2 py-0.5 rounded-full font-bold">${tasks.length} tâches</span>
+                    </div>
+                `;
+                
+                if(tasks.length === 0) {
+                    html += `<div class="border p-6 rounded-2xl text-center bg-slate-50 text-slate-500 italic">Aucune tâche ne correspond aux filtres.</div></div>`;
+                } else {
+                    html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
+                    tasks.forEach(t => {
+                        const rowKeys = Object.keys(t.data);
+                        const title = t.data[g.titleCol] || t.data[rowKeys[0]] || 'Tâche'; 
+                        
+                        let det = "";
+                        const detailKeys = rowKeys.filter(k => k !== g.titleCol).slice(0, 5);
+                        for(let i=0; i<Math.min(5, detailKeys.length); i++) {
+                            const k = detailKeys[i];
+                            if(t.data[k]) {
+                                det += `<div class="bg-slate-50 text-slate-700 text-xs px-2 py-1.5 rounded border border-slate-100 flex items-start gap-2">
+                                    <span class="font-bold opacity-60 uppercase min-w-[30%] shrink-0 text-right">${k}</span>
+                                    <span class="font-medium flex-1">${t.data[k]}</span>
+                                </div>`;
+                            }
+                        }
+
+                        html += `
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-xl hover:border-indigo-400 group transition">
+                            <div class="flex justify-between items-start mb-4">
+                                <h4 class="font-bold text-slate-800 text-base leading-snug group-hover:text-indigo-600 transition flex-1 pr-4">${title}</h4>
+                                <div class="bg-orange-50 text-orange-600 p-2.5 rounded-xl shadow-sm border border-orange-100 flex-shrink-0 group-hover:bg-orange-600 group-hover:text-white transition">
+                                    <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-1.5 mb-5 h-[120px] overflow-hidden relative fade-bottom">
+                                ${det}
+                            </div>
+                            <button onclick="app.openTaskForm('${g.id}', '${t.id}')" class="w-full h-10 bg-indigo-50 text-sm font-bold text-indigo-700 rounded-lg flex items-center justify-center gap-2 group-hover:bg-indigo-600 group-hover:text-white transition shadow-sm border border-indigo-100">
+                                Démarrer la Tâche <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>`;
+                    });
+                    html += `</div></div>`;
+                }
+
+                container.innerHTML = html;
+                lucide.createIcons();
+            },
+
+
+            openTaskForm(groupId, taskId) {
+                let group = null;
+                if(groupId === 'legacy_group') {
+                    group = { formId: this.data.forms[0].id, title: 'Anciennes Tâches' };
+                } else {
+                    group = (this.data.taskGroups || []).find(g => g.id === groupId);
+                }
+                
+                if(!group) return;
+                
+                const targetForm = this.data.forms.find(f => f.id === group.formId);
+                if(!targetForm) return alert("Erreur: Le formulaire associé à cette tâche n'existe plus.");
+
+                let task;
+                if(groupId === 'legacy_group') task = this.data.uploadedTasks.find(t => t.id === taskId);
+                else task = group.tasks.find(t => t.id === taskId);
+                
+                if(!task) return;
+                
+                this.activeForm = targetForm;
+                this.currentTaskData = task.data;
+                this.currentTaskGroupId = groupId;
+                this.currentTaskId = taskId;
+
+                document.getElementById('user-tasks-screen').classList.add('hidden');
+                document.getElementById('form-renderer').classList.remove('hidden');
+                document.getElementById('renderer-title').innerText = "Tâche : " + targetForm.title;
+                
+                this.renderFormFields();
+            },
+            
+            // --- END NEW TASK MANAGEMENT LOGIC ---
+
+
+
             // --- THEME INIT (Static) ---
             initTheme() {
                 try {
@@ -4473,7 +5106,17 @@
                             }
 
                             // 2. Title
-                            if (c.appTitle) {
+                            if (c.taskMenuTitle) {
+                                document.getElementById('user-task-menu-title').innerText = c.taskMenuTitle;
+                                document.getElementById('admin-task-section-title').innerText = c.taskMenuTitle;
+                                document.getElementById('user-tasks-header').innerText = c.taskMenuTitle;
+                            }
+                            if (c.taskMenuTitle) {
+                    const el1 = document.getElementById('user-task-menu-title'); if(el1) el1.innerText = c.taskMenuTitle;
+                    const el2 = document.getElementById('admin-task-section-title'); if(el2) el2.innerText = c.taskMenuTitle;
+                    const el3 = document.getElementById('user-tasks-header'); if(el3) el3.innerText = c.taskMenuTitle;
+                }
+                if (c.appTitle) {
                                 document.querySelectorAll('.app-title-text').forEach(el => el.innerText = c.appTitle);
                                 document.title = c.appTitle;
                             }
@@ -4523,6 +5166,16 @@
                 }
 
                 // Titles
+                if (c.taskMenuTitle) {
+                                document.getElementById('user-task-menu-title').innerText = c.taskMenuTitle;
+                                document.getElementById('admin-task-section-title').innerText = c.taskMenuTitle;
+                                document.getElementById('user-tasks-header').innerText = c.taskMenuTitle;
+                            }
+                            if (c.taskMenuTitle) {
+                    const el1 = document.getElementById('user-task-menu-title'); if(el1) el1.innerText = c.taskMenuTitle;
+                    const el2 = document.getElementById('admin-task-section-title'); if(el2) el2.innerText = c.taskMenuTitle;
+                    const el3 = document.getElementById('user-tasks-header'); if(el3) el3.innerText = c.taskMenuTitle;
+                }
                 if (c.appTitle) {
                     document.querySelectorAll('.app-title-text').forEach(el => el.innerText = c.appTitle);
                     document.title = c.appTitle;
@@ -4558,6 +5211,14 @@
             viewImage(src) {
                 const win = window.open("", "_blank");
                 win.document.write(`<img src="${src}" style="max-width:100%">`);
+            },
+            downloadImage(src, filename) {
+                const a = document.createElement('a');
+                a.href = src;
+                a.download = filename || 'photo.jpg';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             },
             async forceCloudSave() {
                 const status = document.getElementById('cloud-status');
