@@ -489,6 +489,47 @@
                     </div>
                 </div>
 
+                <!-- FOLDERS MANAGEMENT SECTION -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-6">
+                    <h2 class="font-bold text-lg mb-4 flex items-center gap-2 text-indigo-700">
+                        <i data-lucide="folder-kanban" class="w-5 h-5"></i> Gestion des Dossiers
+                    </h2>
+                    <p class="text-sm text-slate-500 mb-4">Créez des dossiers pour organiser vos listes de tâches sur l'écran d'accueil.</p>
+                    
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3">
+                        <h4 class="font-bold text-sm">Nouveau Dossier</h4>
+                        <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                            <input type="text" id="new-task-folder-name" placeholder="Nom du dossier (ex: Maintenance)" class="input-base h-10 flex-1 w-full">
+                            
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <select id="new-task-folder-icon" class="input-base h-10 w-32 flex-shrink-0" onchange="app.pendingFolderIcon = null; document.getElementById('folder-icon-preview').innerHTML = '';">
+                                    <option value="folder">Dossier</option>
+                                    <option value="briefcase">Mallette</option>
+                                    <option value="clipboard-list">Presse-papiers</option>
+                                    <option value="wrench">Clé</option>
+                                    <option value="zap">Éclair</option>
+                                    <option value="layers">Couches</option>
+                                    <option value="box">Boîte</option>
+                                    <option value="truck">Camion</option>
+                                    <option value="users">Utilisateurs</option>
+                                    <option value="alert-triangle">Alerte</option>
+                                </select>
+                                
+                                <label class="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 h-10 whitespace-nowrap">
+                                    <input type="file" class="hidden" accept="image/*" onchange="app.handleFolderIconUpload(this)">
+                                    <i data-lucide="image-plus" class="w-4 h-4"></i> Image
+                                </label>
+                                
+                                <div id="folder-icon-preview" class="w-10 h-10 rounded border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0"></div>
+                            </div>
+
+                            <button onclick="app.saveTaskFolder()" class="bg-indigo-600 text-white font-bold h-10 px-4 rounded hover:bg-indigo-700 w-full sm:w-auto">Créer</button>
+                        </div>
+                    </div>
+
+                    <div id="admin-task-folders-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+                </div>
+
                 <!-- NEW TASKS UPLOAD SECTION -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-6">
                     <h2 class="font-bold text-lg mb-4 flex items-center gap-2 text-indigo-700">
@@ -499,6 +540,9 @@
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3">
                         <h4 class="font-bold text-sm">Nouveau Groupe</h4>
                         <input type="text" id="new-task-group-title" placeholder="Titre du groupe (ex: Routine Mensuelle)" class="input-base h-10 w-full mb-2">
+                        <div class="text-xs font-bold text-slate-500 uppercase mb-1 mt-3">Dossier Cible :</div>
+                        <select id="task-group-folder-select" class="input-base h-10 text-sm w-full mb-3"><option value="default">Dossier Général</option></select>
+
                         <div class="text-xs font-bold text-slate-500 uppercase mb-1">Fichier Excel :</div>
                         <input type="file" id="admin-task-upload" accept=".xlsx, .xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" onchange="app.handleTaskExcelSelect(this)">
                         
@@ -576,12 +620,14 @@
                             <input type="text" id="config-title" class="input-base" placeholder="Ex: Mesure HT">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nom Menu Tâches</label>
-                            <input type="text" id="config-task-name" class="input-base" placeholder="Ex: Tâches Assignées">
-                        </div>
-                        <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Couleur Thème</label>
                             <input type="color" id="config-color" class="w-full h-10 rounded cursor-pointer">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Position des Dossiers de Tâches (Accueil)</label>
+                            <select id="config-task-folders-position" class="input-base text-sm">
+                                <!-- Options populated by JS -->
+                            </select>
                         </div>
                     </div>
                     <div class="mt-4">
@@ -783,24 +829,16 @@
         <main class="max-w-5xl mx-auto p-6">
             <div id="user-forms-grid" class="mb-8"></div>
 
-            <h2 class="font-bold text-lg mb-4">Historique</h2>
-            <div onclick="app.showUserArchive()"
-                class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition flex items-center gap-4">
-                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><i
-                        data-lucide="archive" class="w-6 h-6"></i></div>
-                <div>
-                    <h3 class="font-bold">Consulter les Archives</h3>
-                    <p class="text-sm text-slate-500">Voir les anciens rapports</p>
-                </div>
-            </div>
-            
-            <div onclick="app.showUserTasks()"
-                class="bg-white p-6 rounded-2xl shadow-sm border border-indigo-200 cursor-pointer hover:shadow-md transition flex items-center gap-4 mt-4">
-                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><i
-                        data-lucide="list-todo" class="w-6 h-6"></i></div>
-                <div>
-                    <h3 class="font-bold" id="user-task-menu-title">Tâches Assignées</h3>
-                    <p class="text-sm text-slate-500">Liste des tâches à accomplir via Excel</p>
+            <div id="historique-section" class="mt-8">
+                <h2 class="font-bold text-lg mb-4">Historique</h2>
+                <div onclick="app.showUserArchive()"
+                    class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition flex items-center gap-4">
+                    <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><i
+                            data-lucide="archive" class="w-6 h-6"></i></div>
+                    <div>
+                        <h3 class="font-bold">Consulter les Archives</h3>
+                        <p class="text-sm text-slate-500">Voir les anciens rapports</p>
+                    </div>
                 </div>
             </div>
 
@@ -870,17 +908,17 @@
             <h1 class="font-bold text-lg" id="user-tasks-header">Tâches Assignées</h1>
         </header>
         <main class="max-w-7xl mx-auto p-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6 space-y-4">
+            <div id="task-filters-wrapper" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6 space-y-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <i data-lucide="filter" class="w-5 h-5 text-slate-400"></i>
                         <h3 class="font-bold text-sm text-slate-700">Filtres</h3>
                     </div>
                 </div>
-                <div id="dynamic-task-filters" class="flex flex-wrap gap-2">
+                <div id="dynamic-task-filters" class="flex flex-wrap gap-2 items-end">
                     <!-- Dynamic dropdowns will be injected here -->
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 mt-2">
                     <input type="text" id="task-search-input" onkeyup="app.renderUserTasks()" placeholder="Rechercher partout..." class="input-base w-full h-10">
                     <button onclick="app.resetTaskFilters()" class="px-4 bg-slate-100 text-slate-600 font-bold rounded text-sm hover:bg-slate-200 whitespace-nowrap border h-10">Réinitialiser</button>
                 </div>
@@ -1066,6 +1104,23 @@
                 if (!this.data.users || !this.data.users.find(u => u.role === 'admin')) {
                     this.data.users = this.data.users || [];
                     this.data.users.push({ name: "Admin", pass: "admin", role: "admin" });
+                }
+                
+                // Init Task Folders
+                if (!this.data.taskFolders) {
+                    this.data.taskFolders = [];
+                    if ((this.data.taskGroups && this.data.taskGroups.length > 0) || (this.data.uploadedTasks && this.data.uploadedTasks.length > 0)) {
+                        this.data.taskFolders.push({
+                            id: 'default',
+                            name: 'Dossier Général',
+                            icon: 'folder'
+                        });
+                        if (this.data.taskGroups) {
+                            this.data.taskGroups.forEach(g => {
+                                if (!g.folderId) g.folderId = 'default';
+                            });
+                        }
+                    }
                 }
 
                 // FORCE SUPER ADMIN (YESILOZ)
@@ -2029,8 +2084,22 @@
                 if (id === 'tab-settings') {
                     // Populate Settings
                     document.getElementById('config-title').value = this.data.config.appTitle || '';
-                    document.getElementById('config-task-name').value = this.data.config.taskMenuName || '';
                     document.getElementById('config-color').value = this.data.config.themeColor || '#4f46e5';
+
+                    // Populate Task Folders Position Options
+                    const posSelect = document.getElementById('config-task-folders-position');
+                    if (posSelect) {
+                        let optionsHtml = `<option value="bottom">En bas (Sous l'historique)</option>`;
+                        optionsHtml += `<option value="top">En haut (Au-dessus de tout)</option>`;
+                        
+                        const distinctCats = [...new Set((this.data.forms || []).map(f => (f.category || 'Général').toUpperCase()))];
+                        distinctCats.forEach(cat => {
+                            optionsHtml += `<option value="before_${cat}">Au-dessus de la catégorie : ${cat}</option>`;
+                        });
+                        
+                        posSelect.innerHTML = optionsHtml;
+                        posSelect.value = this.data.config.taskFoldersPosition || 'bottom';
+                    }
 
                     const emailList = this.data.config.emails || [this.data.config.email];
                     if (emailList[0]) document.getElementById('config-email-1').value = emailList[0];
@@ -2568,8 +2637,8 @@
             // --- ADMIN: CONFIG & USERS ---
             saveConfig() {
                 const title = document.getElementById('config-title').value;
-                const taskName = document.getElementById('config-task-name').value;
                 const color = document.getElementById('config-color').value;
+                const taskPos = document.getElementById('config-task-folders-position') ? document.getElementById('config-task-folders-position').value : null;
 
                 // Get 3 emails
                 const e1 = document.getElementById('config-email-1').value.trim();
@@ -2581,8 +2650,8 @@
                 this.data.config.email = e1;
 
                 if (title) this.data.config.appTitle = title;
-                if (taskName) this.data.config.taskMenuName = taskName;
                 if (color) this.data.config.themeColor = color;
+                if (taskPos) this.data.config.taskFoldersPosition = taskPos;
 
                 this.save();
                 this.applyTheme();
@@ -3451,11 +3520,7 @@
                 const mainContainer = document.getElementById('user-forms-grid');
                 if (!mainContainer) return;
 
-                const customName = this.data.config.taskMenuName || 'Tâches Assignées';
-                const menuTitle = document.getElementById('user-task-menu-title');
-                if (menuTitle) menuTitle.innerText = customName;
-                const tasksHeader = document.getElementById('user-tasks-header');
-                if (tasksHeader) tasksHeader.innerText = customName;
+                // Clean up title logic (taskMenuName is removed)
 
                 // Container Style
                 mainContainer.className = "flex flex-col gap-8 fade-in pb-12";
@@ -3506,6 +3571,7 @@
                     // 1. Section Wrapper
                     const section = document.createElement('div');
                     section.className = "space-y-3";
+                    section.dataset.category = cat;
 
                     // 2. Header
                     const header = document.createElement('h3');
@@ -3547,6 +3613,58 @@
                     section.appendChild(grid);
                     mainContainer.appendChild(section);
                 });
+
+                // Render Task Folders dynamically based on config position
+                const existingFolders = document.getElementById('dynamic-task-folders-container');
+                if(existingFolders) existingFolders.remove();
+
+                let folders = this.data.taskFolders || [];
+                if (folders.length === 0 && ((this.data.taskGroups && this.data.taskGroups.length > 0) || (this.data.uploadedTasks && this.data.uploadedTasks.length > 0))) {
+                    folders = [{ id: 'default', name: 'Dossier Général', icon: 'folder' }];
+                }
+                
+                if (folders.length > 0) {
+                    const foldersContainer = document.createElement('div');
+                    foldersContainer.id = 'dynamic-task-folders-container';
+                    foldersContainer.className = "mt-4 mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 w-full shrink-0";
+                    
+                    foldersContainer.innerHTML = folders.map(f => `
+                        <div onclick="app.showUserTasks('${f.id}')"
+                            class="bg-white p-6 rounded-2xl shadow-sm border border-indigo-200 cursor-pointer hover:shadow-md hover:border-indigo-400 hover:-translate-y-1 transition-all flex items-center gap-4 group">
+                            <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform overflow-hidden shrink-0">
+                                ${f.icon && f.icon.startsWith('data:image') ? `<img src="${f.icon}" class="w-full h-full object-cover">` : `<i data-lucide="${f.icon || 'folder'}" class="w-6 h-6"></i>`}
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">${f.name}</h3>
+                                <p class="text-sm text-slate-500">Ouvrir ce dossier de tâches</p>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    const taskPos = (this.data.config && this.data.config.taskFoldersPosition) ? this.data.config.taskFoldersPosition : 'bottom';
+                    const mainElement = mainContainer.parentElement; // <main>
+                    
+                    if (taskPos === 'top') {
+                        mainElement.insertBefore(foldersContainer, mainContainer);
+                    } else if (taskPos.startsWith('before_')) {
+                        const targetCat = taskPos.replace('before_', '');
+                        const targetSection = Array.from(mainContainer.children).find(child => child.dataset.category === targetCat);
+                        if (targetSection) {
+                            mainContainer.insertBefore(foldersContainer, targetSection);
+                        } else {
+                            mainElement.appendChild(foldersContainer); // Fallback
+                        }
+                    } else {
+                        // Bottom (after Historique)
+                        const histSection = document.getElementById('historique-section');
+                        if (histSection && histSection.nextSibling) {
+                            mainElement.insertBefore(foldersContainer, histSection.nextSibling);
+                        } else {
+                            mainElement.appendChild(foldersContainer);
+                        }
+                    }
+                }
+
                 lucide.createIcons();
             },
 
@@ -4706,11 +4824,126 @@
                 };
                 reader.readAsArrayBuffer(file);
             },
+            // --- TASK FOLDERS ---
+            pendingFolderIcon: null,
+            handleFolderIconUpload(input) {
+                if (input.files && input.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.pendingFolderIcon = e.target.result;
+                        document.getElementById('folder-icon-preview').innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">`;
+                        document.getElementById('new-task-folder-icon').value = 'folder'; // Reset select
+                    };
+                    reader.readAsDataURL(input.files[0]);
+                }
+            },
+            
+            saveTaskFolder() {
+                const name = document.getElementById('new-task-folder-name').value.trim();
+                const iconSelect = document.getElementById('new-task-folder-icon').value;
+                const finalIcon = this.pendingFolderIcon || iconSelect || 'folder';
+                
+                if(!name) return alert("Veuillez entrer un nom de dossier.");
+                
+                if(!this.data.taskFolders) this.data.taskFolders = [];
+                this.data.taskFolders.push({
+                    id: 'folder_' + Date.now(),
+                    name: name,
+                    icon: finalIcon
+                });
+                this.save();
+                document.getElementById('new-task-folder-name').value = '';
+                this.pendingFolderIcon = null;
+                const preview = document.getElementById('folder-icon-preview');
+                if(preview) preview.innerHTML = '';
+                this.renderAdminTaskFolders();
+                alert(`Dossier "${name}" créé avec succès.`);
+            },
+
+            deleteTaskFolder(id) {
+                const hasTasks = (this.data.taskGroups || []).some(g => g.folderId === id);
+                if(hasTasks) return alert("Ce dossier contient des listes de tâches. Veuillez d'abord les déplacer ou les supprimer.");
+                
+                if(confirm("Supprimer ce dossier ?")) {
+                    this.data.taskFolders = this.data.taskFolders.filter(f => f.id !== id);
+                    this.save();
+                    this.renderAdminTaskFolders();
+                }
+            },
+
+            renameTaskFolder(id) {
+                const folder = this.data.taskFolders.find(f => f.id === id);
+                if(!folder) return;
+                const newName = prompt("Nouveau nom du dossier :", folder.name);
+                if(newName && newName.trim() !== "") {
+                    folder.name = newName.trim();
+                    this.save();
+                    this.renderAdminTaskFolders();
+                    this.renderAdminTaskGroups();
+                    if(app.renderUserDashboard) app.renderUserDashboard();
+                }
+            },
+
+            renderAdminTaskFolders() {
+                const container = document.getElementById('admin-task-folders-list');
+                const selectEl = document.getElementById('task-group-folder-select');
+                if(!container || !selectEl) return;
+                
+                let folders = this.data.taskFolders || [];
+                if(folders.length === 0) {
+                    folders = [{ id: 'default', name: 'Dossier Général', icon: 'folder' }];
+                }
+                
+                container.innerHTML = folders.map(f => `
+                    <div class="bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded flex items-center justify-center shrink-0 overflow-hidden">
+                                ${f.icon && f.icon.startsWith('data:image') ? `<img src="${f.icon}" class="w-full h-full object-cover">` : `<i data-lucide="${f.icon || 'folder'}" class="w-5 h-5"></i>`}
+                            </div>
+                            <span class="font-bold text-sm text-slate-700">${f.name}</span>
+                        </div>
+                        <div class="flex gap-1 shrink-0">
+                            <button onclick="app.renameTaskFolder('${f.id}')" class="text-blue-500 hover:bg-blue-50 p-2 rounded" title="Renommer le dossier"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                            <button onclick="app.deleteTaskFolder('${f.id}')" class="text-red-500 hover:bg-red-50 p-2 rounded" title="Supprimer le dossier"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                selectEl.innerHTML = folders.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+                lucide.createIcons();
+            },
+
+            changeTaskGroupFolder(groupId, newFolderId) {
+                if (groupId === 'legacy_group') {
+                    if(this.data.uploadedTasks && this.data.uploadedTasks.length > 0) {
+                        if (!this.data.taskGroups) this.data.taskGroups = [];
+                        this.data.taskGroups.push({
+                            id: 'legacy_group_migrated_' + Date.now(),
+                            title: 'Anciennes Tâches',
+                            titleCol: Object.keys(this.data.uploadedTasks[0].data)[0] || 'Titre',
+                            formId: this.data.forms && this.data.forms.length > 0 ? this.data.forms[0].id : '',
+                            tasks: this.data.uploadedTasks,
+                            folderId: newFolderId
+                        });
+                        this.data.uploadedTasks = [];
+                        this.save();
+                        this.renderAdminTaskGroups();
+                        return;
+                    }
+                }
+                const group = this.data.taskGroups.find(g => g.id === groupId);
+                if(group) {
+                    group.folderId = newFolderId;
+                    this.save();
+                    this.renderAdminTaskGroups();
+                }
+            },
 
             saveTaskGroup() {
                 const title = document.getElementById('new-task-group-title').value.trim();
                 const titleCol = document.getElementById('task-group-title-col').value;
                 const formId = document.getElementById('task-group-form').value;
+                const folderId = document.getElementById('task-group-folder-select').value;
                 
                 if(!title || !titleCol || !formId || !this.pendingTaskData) {
                     return alert("Veuillez remplir tous les champs et charger un fichier Excel.");
@@ -4723,6 +4956,7 @@
                     title: title,
                     titleCol: titleCol,
                     formId: formId,
+                    folderId: folderId || 'default',
                     tasks: this.pendingTaskData.map((row, i) => ({
                         id: 'task_' + Date.now() + "_" + i,
                         data: row,
@@ -4837,11 +5071,20 @@
                     return;
                 }
                 
-                container.innerHTML = groups.map(g => `
+                const folders = this.data.taskFolders && this.data.taskFolders.length > 0 
+                    ? this.data.taskFolders 
+                    : [{ id: 'default', name: 'Dossier Général' }];
+
+                container.innerHTML = groups.map(g => {
+                    const currentFolderId = g.folderId || 'default';
+                    return `
                     <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex justify-between items-center">
                         <div class="truncate mr-4 flex-1">
                             <h4 class="font-bold text-indigo-800 text-sm truncate">${g.title}</h4>
-                            <p class="text-xs text-indigo-600 truncate">${g.tasks.length} tâches | Col Titre: ${g.titleCol}</p>
+                            <p class="text-xs text-indigo-600 truncate mb-1">${g.tasks.length} tâches | Col Titre: ${g.titleCol}</p>
+                            <select onchange="app.changeTaskGroupFolder('${g.id}', this.value)" class="text-xs input-base h-6 py-0 px-1 w-auto border-indigo-200 bg-white text-indigo-700 font-medium">
+                                ${folders.map(f => `<option value="${f.id}" ${currentFolderId === f.id ? 'selected' : ''}>📁 ${f.name}</option>`).join('')}
+                            </select>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <button onclick="document.getElementById('update-excel-${g.id}').click()" class="p-2 text-blue-600 bg-white border border-blue-200 hover:bg-blue-50 rounded-md shadow-sm" title="Mettre à jour Excel"><i data-lucide="upload" class="w-4 h-4"></i></button>
@@ -4850,11 +5093,21 @@
                             <button onclick="app.deleteTaskGroup('${g.id}')" class="p-2 text-red-500 bg-white border border-red-200 hover:bg-red-50 rounded-md shadow-sm" title="Supprimer la liste"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
                 lucide.createIcons();
             },
 
-            showUserTasks() {
+            showUserTasks(folderId = 'default') {
+                this.currentTaskFolderId = folderId;
+                
+                // Update header
+                const headerEl = document.getElementById('user-tasks-header');
+                if (headerEl) {
+                    const folders = this.data.taskFolders || [];
+                    const folder = folders.find(f => f.id === folderId) || { name: 'Dossier Général' };
+                    headerEl.innerText = folder.name;
+                }
+
                 document.getElementById('user-menu').classList.add('hidden');
                 document.getElementById('user-tasks-screen').classList.remove('hidden');
                 
@@ -4865,8 +5118,8 @@
             
             resetTaskFilters() {
                 this.activeTaskFilters = {};
-                document.getElementById('task-search-input').value = '';
-                // Resets all selects
+                const searchEl = document.getElementById('task-search-input');
+                if (searchEl) searchEl.value = '';
                 document.querySelectorAll('.task-filter-select').forEach(s => s.value = '');
                 this.renderUserTasks(false);
             },
@@ -4883,7 +5136,10 @@
             
             showTaskGroupDetail(groupId) {
                 this.focusedTaskGroupId = groupId;
-                this.resetTaskFilters(); // calls renderUserTasks internally
+                this.activeTaskFilters = {};
+                const searchEl = document.getElementById('task-search-input');
+                if (searchEl) searchEl.value = '';
+                this.renderUserTasks(true);
             },
 
             backToTaskGroups() {
@@ -4905,9 +5161,13 @@
                         title: 'Anciennes Tâches',
                         titleCol: Object.keys(this.data.uploadedTasks[0].data)[0],
                         formId: this.data.forms && this.data.forms.length > 0 ? this.data.forms[0].id : '',
-                        tasks: this.data.uploadedTasks
+                        tasks: this.data.uploadedTasks,
+                        folderId: 'default'
                     }, ...allGroups];
                 }
+                
+                // Filter groups by current folder
+                allGroups = allGroups.filter(g => (g.folderId || 'default') === this.currentTaskFolderId);
 
                 if (allGroups.length === 0) {
                     container.innerHTML = `<div class="border p-6 rounded-2xl text-center bg-slate-50 text-slate-500 italic">Aucune tâche assignée.</div>`;
@@ -4917,6 +5177,8 @@
                 
                 // IF NO GROUP FOCUSED -> Show List of Groups (Categories)
                 if(!this.focusedTaskGroupId) {
+                    const wrapper = document.getElementById('task-filters-wrapper');
+                    if(wrapper) wrapper.classList.add('hidden');
                     if(filtersContainer) filtersContainer.innerHTML = '';
                     
                     let groupsHtml = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
@@ -4945,6 +5207,9 @@
                 // IF GROUP IS FOCUSED -> Show Tasks of that group
                 let g = allGroups.find(gr => gr.id === this.focusedTaskGroupId);
                 if(!g) return this.backToTaskGroups();
+
+                const wrapper = document.getElementById('task-filters-wrapper');
+                if(wrapper) wrapper.classList.remove('hidden');
                 
                 let tasks = g.tasks;
                 
@@ -4963,14 +5228,14 @@
                 
                 // 1. Build Extracted Filters UI
                 if(rebuildFilters && filtersContainer) {
-                    let filterHTML = `<button onclick="app.backToTaskGroups()" class="flex-shrink-0 h-10 px-4 rounded-lg text-white bg-slate-800 border-slate-700 font-bold text-sm hover:bg-slate-900 flex items-center gap-2 shadow-md mr-4"><i data-lucide="folder-output" class="w-4 h-4"></i> Quitter</button>`;
+                    let filterHTML = `<button onclick="app.backToTaskGroups()" class="flex-shrink-0 h-10 px-4 rounded-lg text-white bg-slate-800 border-slate-700 font-bold text-sm hover:bg-slate-900 flex items-center gap-2 shadow-md mb-2 mr-4"><i data-lucide="folder-output" class="w-4 h-4"></i> Quitter</button>`;
                     const colsArray = Array.from(allCols).slice(0, 10);
                     
                     colsArray.forEach(c => {
                         if(colValues[c].size > 0 && colValues[c].size < 50) { 
                             const opts = Array.from(colValues[c]).sort();
                             filterHTML += `
-                                <div class="flex-shrink-0">
+                                <div class="flex-shrink-0 mb-2">
                                     <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1 truncate max-w-[120px]" title="${c}">${c}</label>
                                     <select class="input-base h-8 text-xs py-0 w-32 task-filter-select" onchange="app.onTaskFilterChange('${c.replace(/'/g, "\'")}', this.value)">
                                         <option value="">Tous</option>
